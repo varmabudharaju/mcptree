@@ -1,0 +1,39 @@
+from pathlib import Path
+
+import pytest
+
+from mcptree.cli import main, render_mermaid
+from mcptree.loader import load_tree_file
+
+TREE_PATH = Path(__file__).parent.parent / "trees" / "incident.yaml"
+
+
+def test_render_mermaid_shapes_and_edges() -> None:
+    m = render_mermaid(load_tree_file(TREE_PATH))
+    assert m.startswith("flowchart TD")
+    assert "branch_on_status{" in m          # condition -> diamond
+    assert "all_clear([" in m                # terminal -> stadium
+    assert 'check_health["' in m             # action -> rect
+    assert "-- eq 200 -->" in m
+    assert "-- default -->" in m
+    assert "-- oom -->" in m
+
+
+def test_validate_command_ok(capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["validate", str(TREE_PATH.parent)])
+    assert code == 0
+    assert "OK" in capsys.readouterr().out
+
+
+def test_validate_command_bad(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    bad = TREE_PATH.read_text().replace("then: all_clear", "then: ghost")
+    (tmp_path / "bad.yaml").write_text(bad)
+    code = main(["validate", str(tmp_path)])
+    assert code == 1
+    assert "ghost" in capsys.readouterr().out
+
+
+def test_viz_command(capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["viz", str(TREE_PATH)])
+    assert code == 0
+    assert "flowchart TD" in capsys.readouterr().out
