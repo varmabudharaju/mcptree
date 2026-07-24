@@ -254,6 +254,13 @@ def submit(
         if isinstance(node, JudgmentNode) and node.require_rationale and not rationale:
             return envelope(state, error="rationale_required: include a rationale for this judgment")
         if isinstance(node, AskNode) and not node.options:
+            encoded = _json.dumps(value, default=str)
+            if len(encoded.encode()) > MAX_FACT_BYTES:
+                return envelope(
+                    state,
+                    error=f"fact_too_large: answer exceeds {MAX_FACT_BYTES} bytes; "
+                    "trim or summarize before answering",
+                )
             assert node.next is not None
             target = node.next
         else:

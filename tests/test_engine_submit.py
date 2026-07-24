@@ -130,3 +130,41 @@ def test_fact_too_large_rejected() -> None:
     huge = {"status": 503, "blob": "x" * (MAX_FACT_BYTES + 10)}
     env = submit(state, 1, huge)
     assert env["error"].startswith("fact_too_large")
+
+
+def free_text_ask_tree() -> object:
+    return tree_from_dict(
+        {
+            "mcptree": "0.1",
+            "id": "notes",
+            "title": "Free Text Notes",
+            "entry": "ask_notes",
+            "nodes": {
+                "ask_notes": {
+                    "type": "ask",
+                    "prompt": "What are your notes?",
+                    "capture": "notes",
+                    "next": "done",
+                },
+                "done": {"type": "terminal", "outcome": "collected", "summary": "notes saved"},
+            },
+        }
+    )
+
+
+def test_free_text_ask_small_answer_captured() -> None:
+    state = start(free_text_ask_tree())
+    assert state.current_node == "ask_notes"
+    env = submit(state, 1, "hello world")
+    assert env["error"] is None
+    assert env["state"] == "done" and env["outcome"] == "collected"
+    assert state.facts["notes"] == "hello world"
+
+
+def test_free_text_ask_too_large_rejected() -> None:
+    state = start(free_text_ask_tree())
+    huge_text = "x" * (MAX_FACT_BYTES + 10)
+    env = submit(state, 1, huge_text)
+    assert env["error"].startswith("fact_too_large")
+    assert env["node"] == "ask_notes" and env["step"] == 1
+    assert "notes" not in state.facts
