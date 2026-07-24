@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json as _json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -209,3 +210,86 @@ def envelope(state: SessionState, error: str | None = None) -> dict[str, object]
 
 def _present(value: object) -> object:
     return value if value is not None else None
+
+
+def check_schema(value: object, schema: dict[str, object]) -> str | None:
+    types: dict[str, type | tuple[type, ...]] = {
+        "object": dict, "array": list, "string": str,
+        "integer": int, "number": (int, float), "boolean": bool,
+    }
+    t = schema.get("type")
+    if isinstance(t, str) and t in types:
+        if t in ("integer", "number") and isinstance(value, bool):
+            return f"expected {t}, got boolean"
+        if not isinstance(value, types[t]):
+            return f"expected {t}, got {type(value).__name__}"
+    if t == "object" and isinstance(value, dict):
+        required = schema.get("required", [])
+        if isinstance(required, list):
+            for key in required:
+                if key not in value:
+                    return f"missing required key '{key}'"
+    return None
+
+
+def submit(
+    state: SessionState,
+    step: int,
+    value: object,
+    rationale: str | None = None,
+    is_error: bool = False,
+) -> dict[str, object]:
+    if state.done:
+        return envelope(state, error="finished_session: this session has ended")
+    if step != state.step:
+        return envelope(
+            state, error=f"step_mismatch: expected step {state.step}, got {step}"
+        )
+    node = state.tree.nodes[state.current_node]
+
+    if isinstance(node, (AskNode, JudgmentNode)):
+        options = [o.id for o in node.options]
+        if options and value not in options:
+            return envelope(state, error=f"invalid_option: expected one of {options}")
+        if isinstance(node, JudgmentNode) and node.require_rationale and not rationale:
+            return envelope(state, error="rationale_required: include a rationale for this judgment")
+        if isinstance(node, AskNode) and not node.options:
+            assert node.next is not None
+            target = node.next
+        else:
+            target = next(o.then for o in node.options if o.id == value)
+        if isinstance(node, AskNode) and node.capture:
+            state.facts[node.capture] = value
+        _append(state, node.id, value, target, rationale)
+    elif isinstance(node, ActionNode):
+        if is_error:
+            if node.on_error is None:
+                return envelope(
+                    state,
+                    error="tool_error_unhandled: tool failed and no on_error branch; retry or abort",
+                )
+            target = node.on_error
+            _append(state, node.id, {"error": value}, target)
+        else:
+            encoded = _json.dumps(value, default=str)
+            if len(encoded.encode()) > MAX_FACT_BYTES:
+                return envelope(
+                    state,
+                    error=f"fact_too_large: result exceeds {MAX_FACT_BYTES} bytes; "
+                    "trim or summarize before reporting",
+                )
+            if node.schema is not None:
+                problem = check_schema(value, node.schema)
+                if problem is not None:
+                    return envelope(state, error=f"schema_mismatch: {problem}")
+            if node.capture:
+                state.facts[node.capture] = value
+            target = node.next
+            _append(state, node.id, value, target)
+    else:  # pragma: no cover - condition/terminal never await input
+        raise AssertionError(f"node {node.id} cannot accept submissions")
+
+    state.current_node = target
+    state.step += 1
+    _advance(state)
+    return envelope(state)
