@@ -1,0 +1,67 @@
+mcptree: "0.1"
+id: incident-triage
+title: Production incident triage
+entry: check_health
+
+nodes:
+  check_health:
+    type: action
+    tool: http_get
+    args: { url: "https://api.example.com/health" }
+    result: { capture: health }
+    next: branch_on_status
+
+  branch_on_status:
+    type: condition
+    on: health.status
+    branches:
+      - when: { eq: 200 }
+        then: all_clear
+      - when: { gte: 500 }
+        then: inspect_logs
+    default: ask_maintenance
+
+  inspect_logs:
+    type: action
+    tool: get_logs
+    args: { service: api, lines: 200 }
+    result: { capture: logs }
+    next: classify_error
+
+  classify_error:
+    type: judgment
+    prompt: Classify the dominant error in the logs.
+    evidence: [logs]
+    options:
+      - { id: oom,     then: remediate_oom }
+      - { id: db_conn, then: remediate_db }
+      - { id: unknown, then: escalate }
+    require_rationale: true
+
+  ask_maintenance:
+    type: ask
+    prompt: Is there a scheduled maintenance window right now?
+    options:
+      - { id: "yes", then: all_clear }
+      - { id: "no",  then: escalate }
+    capture: maintenance_window
+
+  all_clear:
+    type: terminal
+    outcome: resolved
+    summary: "Service healthy; no action required."
+
+  remediate_oom:
+    type: terminal
+    outcome: remediate
+    summary: "Restart with increased memory limit; see runbook §4."
+
+  remediate_db:
+    type: terminal
+    outcome: remediate
+    summary: "Recycle DB connection pool; verify with health check."
+
+  escalate:
+    type: terminal
+    outcome: escalate
+    summary: "Page on-call; attach the tree trace."
