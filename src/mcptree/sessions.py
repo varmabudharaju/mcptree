@@ -29,15 +29,13 @@ def state_from_dict(d: dict[str, object]) -> SessionState:
     tree = tree_from_dict(d["tree_raw"])  # type: ignore[arg-type]
     trace_list = cast(list[Any], d["trace"])
     trace = [TraceEntry(**t) for t in trace_list]
-    facts_obj = cast(dict[str, object], d["facts"])
-    step_obj = cast(int, d["step"])
     return SessionState(
         session_id=str(d["session_id"]),
         tree=tree,
         tree_hash=str(d["tree_hash"]),
         current_node=str(d["current_node"]),
-        step=step_obj,
-        facts=facts_obj,
+        step=int(d["step"]),  # type: ignore[call-overload]
+        facts=dict(cast(dict[str, object], d["facts"])),
         trace=trace,
         done=bool(d["done"]),
         outcome=d["outcome"] if d["outcome"] is None else str(d["outcome"]),

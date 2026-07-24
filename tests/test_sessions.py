@@ -36,6 +36,18 @@ def test_state_round_trip() -> None:
     assert restored.tree.id == "t"
 
 
+def test_state_round_trip_facts_isolation() -> None:
+    """Regression: ensure facts is copied, not aliased."""
+    state = start(tree_from_dict(TREE_DICT))
+    submit(state, 1, {"v": 1})
+    restored = state_from_dict(state_to_dict(state))
+    # Verify facts is a separate object
+    assert restored.facts is not state.facts
+    # Mutate restored.facts and verify original is unchanged
+    restored.facts["r"] = {"v": 999}
+    assert state.facts == {"r": {"v": 1}}
+
+
 def test_json_store_save_load_list(tmp_path: Path) -> None:
     store = JsonSessionStore(tmp_path / "sessions")
     state = start(tree_from_dict(TREE_DICT))
