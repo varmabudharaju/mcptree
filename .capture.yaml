@@ -1,0 +1,63 @@
+output:
+  dir: docs/screenshots
+  evidence: docs/test-evidence.md
+  title: mcptree
+
+# Visual proof: mcptree validate/viz plus the crash-proof-resume demo — two real
+# OS processes, sharing only the sessions directory on disk (examples/incident_response.py).
+# Run: capture run   (see /Users/varma/capture)
+
+shots:
+  - name: mcptree-validate
+    kind: cli
+    command: "mcptree validate trees/"
+    cwd: /Users/varma/mcptree
+    cols: 100
+    rows: 6
+    alt: >-
+      mcptree validate trees/ — lints every tree in the directory (node types,
+      required fields, dangling refs) and fails fast on the first error;
+      incident-triage passes.
+
+  - name: mcptree-viz
+    kind: cli
+    command: "mcptree viz trees/incident.yaml"
+    cwd: /Users/varma/mcptree
+    cols: 100
+    rows: 26
+    alt: >-
+      mcptree viz trees/incident.yaml — the incident-triage tree rendered as a
+      Mermaid flowchart: all five node types (action, condition, judgment, ask,
+      terminal), branch labels, and the on_error edge, generated straight from
+      the YAML.
+
+  - name: incident-demo
+    kind: session
+    cwd: /Users/varma/mcptree
+    cols: 112
+    rows: 16
+    clear_between: false
+    steps:
+      - name: demo-phase1-start
+        command: >-
+          rm -rf examples/.demo_sessions;
+          python3 examples/incident_response.py phase1 2>/dev/null | tee /tmp/mcptree_demo_phase1.txt
+        alt: >-
+          Process 1 (phase1) — a fresh OS process: tree_start opens a session on
+          incident-triage, tree_answer reports a 503 health check and the engine
+          auto-advances past the pure-data condition node straight to
+          inspect_logs, then the process exits. The session lives only on disk
+          from here.
+        wait_ms: 3000
+      - name: demo-phase2-resume
+        command: >-
+          python3 examples/incident_response.py phase2
+          $(grep -o 'ses_[a-f0-9]*' /tmp/mcptree_demo_phase1.txt | head -1) 2>/dev/null
+        alt: >-
+          Process 2 (phase2) — a brand-new OS process, sharing nothing with
+          phase1 but the sessions directory: tree_status resumes the same
+          session_id at inspect_logs, tree_answer reports OOM logs then the
+          judgment classification, landing on outcome: remediate. tree_trace
+          prints the full audit path from check_health to remediate_oom — real
+          crash-proof resume, not a mock.
+        wait_ms: 3000

@@ -1,0 +1,60 @@
+{
+  "schema_version": "1",
+  "generated_at": "2026-07-24T02:49:37Z",
+  "config": ".capture.yaml",
+  "shot_count": 4,
+  "shots": [
+    {
+      "index": 1,
+      "name": "mcptree-validate",
+      "kind": "cli",
+      "alt": "mcptree validate trees/ \u2014 lints every tree in the directory (node types, required fields, dangling refs) and fails fast on the first error; incident-triage passes.",
+      "file": "01-mcptree-validate.png",
+      "bytes": 37287,
+      "sha256": "8142c4bfcabf55f9fc961bfcd41fd995c6944bce48b6461800aa18367156a217",
+      "deterministic": false,
+      "source": "mcptree validate trees/"
+    },
+    {
+      "index": 2,
+      "name": "mcptree-viz",
+      "kind": "cli",
+      "alt": "mcptree viz trees/incident.yaml \u2014 the incident-triage tree rendered as a Mermaid flowchart: all five node types (action, condition, judgment, ask, terminal), branch labels, and the on_error edge, generated straight from the YAML.",
+      "file": "02-mcptree-viz.png",
+      "bytes": 177177,
+      "sha256": "e6ce31ad498c8bcf283c6c6653a494e45ced7a60151eb9d16bf5ef1917a98ac4",
+      "deterministic": false,
+      "source": "mcptree viz trees/incident.yaml"
+    },
+    {
+      "index": 3,
+      "name": "demo-phase1-start",
+      "kind": "session",
+      "alt": "Process 1 (phase1) \u2014 a fresh OS process: tree_start opens a session on incident-triage, tree_answer reports a 503 health check and the engine auto-advances past the pure-data condition node straight to inspect_logs, then the process exits. The session lives only on disk from here.",
+      "file": "03-demo-phase1-start.png",
+      "bytes": 94272,
+      "sha256": "a24ff253e4cafb4dd65ddf04842b141e15f8d924330d798024bea55b555fcea9",
+      "deterministic": false,
+      "source": "rm -rf examples/.demo_sessions; python3 examples/incident_response.py phase1 2>/dev/null | tee /tmp/mcptree_demo_phase1.txt"
+    },
+    {
+      "index": 4,
+      "name": "demo-phase2-resume",
+      "kind": "session",
+      "alt": "Process 2 (phase2) \u2014 a brand-new OS process, sharing nothing with phase1 but the sessions directory: tree_status resumes the same session_id at inspect_logs, tree_answer reports OOM logs then the judgment classification, landing on outcome: remediate. tree_trace prints the full audit path from check_health to remediate_oom \u2014 real crash-proof resume, not a mock.",
+      "file": "04-demo-phase2-resume.png",
+      "bytes": 144606,
+      "sha256": "65de04006ae43bde4f5a2be17958ec61470c271a5d412f036c4aa7e5b9173bb6",
+      "deterministic": false,
+      "source": "python3 examples/incident_response.py phase2 $(grep -o 'ses_[a-f0-9]*' /tmp/mcptree_demo_phase1.txt | head -1) 2>/dev/null"
+    }
+  ],
+  "environment": {
+    "shotlist": "0.3.3",
+    "python": "3.11.1",
+    "platform": "darwin",
+    "playwright": "1.60.0",
+    "chromium": null
+  },
+  "git_sha": "c23d6de"
+}

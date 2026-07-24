@@ -21,6 +21,25 @@ agent escalate this?" always has an answer.
 - [`docs/use-case.md`](docs/use-case.md) — a captioned walkthrough of the
   incident tree below, call by call, with real envelope JSON.
 
+## See it work
+
+[`examples/incident_response.py`](examples/incident_response.py) is a real
+two-process crash-proof-resume demo: each phase spawns its own `mcptree serve`
+stdio subprocess, sharing nothing but the sessions directory on disk. Process 1
+starts the tree and reports a failing health check; process 2 — a brand-new OS
+process run later — resumes the exact same session by id, reports the logs,
+makes the judgment call, and reaches `outcome: remediate` with the full audit
+trace. Real terminal output, no mocking:
+
+<img src="docs/screenshots/03-demo-phase1-start.png" width="100%" alt="Process 1 (phase1): tree_start opens a session on incident-triage, tree_answer reports a 503 health check and auto-advances to inspect_logs, then the process exits."/>
+
+<img src="docs/screenshots/04-demo-phase2-resume.png" width="100%" alt="Process 2 (phase2), a brand-new OS process: tree_status resumes the same session_id from disk, reports OOM logs, classifies the error, reaches outcome: remediate, and tree_trace prints the full audit path."/>
+
+Run it yourself: `python3 examples/incident_response.py phase1`, then in a
+*separate* invocation `python3 examples/incident_response.py phase2 <session_id>`
+(the first phase prints the exact command). More shots — `mcptree validate` and
+`mcptree viz` — are in [`docs/test-evidence.md`](docs/test-evidence.md).
+
 ## Quickstart A — mount onto an existing FastMCP server
 
 One line adds the whole protocol (five tools, session persistence, an audit
