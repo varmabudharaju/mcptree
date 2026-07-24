@@ -64,3 +64,26 @@ def test_load_yaml11_unquoted_on_key(tmp_path: Path) -> None:
     cond = tree.nodes["go"]
     assert cond.type == "condition"
     assert cond.on == "x"
+
+
+def test_load_missing_file(tmp_path: Path) -> None:
+    """File I/O failure: missing file raises TreeLoadError with 'cannot read'."""
+    p = tmp_path / "nope.yaml"
+    with pytest.raises(TreeLoadError, match="cannot read"):
+        load_tree_file(p)
+
+
+def test_load_invalid_yaml_syntax(tmp_path: Path) -> None:
+    """YAML syntax error: unclosed bracket raises TreeLoadError with 'invalid YAML'."""
+    p = tmp_path / "bad_syntax.yaml"
+    p.write_text("a: [unclosed")
+    with pytest.raises(TreeLoadError, match="invalid YAML"):
+        load_tree_file(p)
+
+
+def test_load_non_dict_top_level(tmp_path: Path) -> None:
+    """Non-dict top level: YAML list raises TreeLoadError with 'top level'."""
+    p = tmp_path / "list.yaml"
+    p.write_text("- 1\n- 2")
+    with pytest.raises(TreeLoadError, match="top level"):
+        load_tree_file(p)

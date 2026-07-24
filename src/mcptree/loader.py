@@ -16,7 +16,13 @@ class TreeLoadError(Exception):
 
 def load_tree_file(path: Path) -> Tree:
     try:
-        data = yaml.safe_load(path.read_text())
+        text = path.read_text()
+    except OSError as exc:
+        raise TreeLoadError(f"{path}: cannot read file: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise TreeLoadError(f"{path}: not valid UTF-8: {exc}") from exc
+    try:
+        data = yaml.safe_load(text)
     except yaml.YAMLError as exc:
         raise TreeLoadError(f"{path}: invalid YAML: {exc}") from exc
     if not isinstance(data, dict):
