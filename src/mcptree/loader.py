@@ -21,6 +21,12 @@ def load_tree_file(path: Path) -> Tree:
         raise TreeLoadError(f"{path}: invalid YAML: {exc}") from exc
     if not isinstance(data, dict):
         raise TreeLoadError(f"{path}: top level must be a mapping")
+    # Normalize YAML-1.1 boolean 'on' key: bare 'on:' in YAML parses as True key
+    nodes = data.get("nodes", {})
+    if isinstance(nodes, dict):
+        for node in nodes.values():
+            if isinstance(node, dict) and True in node and "on" not in node:
+                node["on"] = node.pop(True)
     try:
         tree = tree_from_dict(data)
     except TreeParseError as exc:

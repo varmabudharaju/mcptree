@@ -12,7 +12,7 @@ entry: go
 nodes:
   go:
     type: condition
-    "on": x
+    on: x
     branches:
       - when: { eq: 1 }
         then: end
@@ -54,3 +54,13 @@ def test_load_dir_duplicate_id(tmp_path: Path) -> None:
 def test_load_dir_empty(tmp_path: Path) -> None:
     with pytest.raises(TreeLoadError, match="no trees"):
         load_trees_dir(tmp_path)
+
+
+def test_load_yaml11_unquoted_on_key(tmp_path: Path) -> None:
+    """Regression: YAML-1.1 parses bare 'on' as boolean True key. Loader must normalize."""
+    p = tmp_path / "on_key.yaml"
+    p.write_text(VALID)
+    tree = load_tree_file(p)
+    cond = tree.nodes["go"]
+    assert cond.type == "condition"
+    assert cond.on == "x"
