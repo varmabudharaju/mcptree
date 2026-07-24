@@ -148,7 +148,7 @@ Concretely: if a node mapping has a boolean-`True` key and no string `"on"` key,
 the loader rewrites the boolean key to the string `"on"` before validation. This
 normalization applies only to the node-level `on:` field.
 
-The inverse gotcha remains: **option/branch **id**s that look like YAML booleans
+The inverse gotcha remains: **option/branch ids that look like YAML booleans
 (`yes`, `no`, `on`, `off`, `true`, `false`) MUST be quoted** by the author (as in
 `ask_maintenance` above: `{ id: "yes", then: all_clear }`), or YAML will parse them
 as booleans rather than the strings the engine compares option ids against.
