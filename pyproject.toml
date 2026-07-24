@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcptree"
+version = "0.1.0"
+description = "Open protocol + FastMCP-style framework for declarative decision trees in MCP"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Varma Budharaju" }]
+dependencies = ["fastmcp>=2.0", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "mypy>=1.10", "ruff>=0.5", "types-PyYAML"]
+
+[project.scripts]
+mcptree = "mcptree.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcptree"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+
+[tool.ruff]
+line-length = 100
