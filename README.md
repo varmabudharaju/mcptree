@@ -1,5 +1,9 @@
 # mcptree
 
+[![CI](https://github.com/varmabudharaju/mcptree/actions/workflows/ci.yml/badge.svg)](https://github.com/varmabudharaju/mcptree/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
+
 **FastMCP made tools easy. mcptree makes decisions declarative.**
 
 MCP gives servers tools, resources, prompts, and elicitation — but no primitive
