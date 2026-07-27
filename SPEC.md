@@ -441,8 +441,9 @@ at-least-once delivery safe: replaying the same `(session_id, step, value)` afte
 a successful advance is a no-op that returns the *new* current envelope with a
 `step_mismatch` error, never a double-advance.
 
-`step` (envelope field, resets per node reached) is distinct from `seq` (trace
-entry field, strictly increasing for the life of the session) — see §5.5.
+`step` (envelope field, increments once per accepted submission and never
+resets) is distinct from `seq` (trace entry field, strictly increasing for the
+life of the session) — see §5.5.
 
 ### 5.3 In-envelope errors
 
@@ -512,6 +513,9 @@ mount/CLI invocation). This makes sessions survive server restarts: an agent tha
 lost all context can call `tree_status(session_id)` on a freshly started server
 process and get back the exact envelope it would have gotten before the restart.
 Session ids have the form `ses_` followed by 12 lowercase hex characters.
+
+Session saves are atomic per session file; no cross-session or cross-process
+locking is guaranteed.
 
 ---
 

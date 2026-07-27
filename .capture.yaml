@@ -26,8 +26,7 @@ shots:
     alt: >-
       mcptree viz trees/incident.yaml — the incident-triage tree rendered as a
       Mermaid flowchart: all five node types (action, condition, judgment, ask,
-      terminal), branch labels, and the on_error edge, generated straight from
-      the YAML.
+      terminal) and branch labels, generated straight from the YAML.
 
   - name: incident-demo
     kind: session
