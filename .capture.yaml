@@ -11,7 +11,6 @@ shots:
   - name: mcptree-validate
     kind: cli
     command: "mcptree validate trees/"
-    cwd: /Users/varma/mcptree
     cols: 100
     rows: 6
     alt: >-
@@ -22,7 +21,6 @@ shots:
   - name: mcptree-viz
     kind: cli
     command: "mcptree viz trees/incident.yaml"
-    cwd: /Users/varma/mcptree
     cols: 100
     rows: 26
     alt: >-
@@ -33,7 +31,6 @@ shots:
 
   - name: incident-demo
     kind: session
-    cwd: /Users/varma/mcptree
     cols: 112
     rows: 16
     clear_between: false
