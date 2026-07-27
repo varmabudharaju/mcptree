@@ -28,21 +28,24 @@ def load_tree_file(path: Path) -> Tree:
         raise TreeLoadError(f"{path}: invalid YAML: {exc}") from exc
     if not isinstance(data, dict):
         raise TreeLoadError(f"{path}: top level must be a mapping")
-    try:
-        # No sort_keys: YAML-1.1 bare 'on:' keys parse as bool True at this
-        # point (normalized just below) and sorting mixed bool/str keys
-        # raises TypeError unrelated to the non-JSON-value check below.
-        json.dumps(data)
-    except (TypeError, ValueError) as exc:
-        raise TreeLoadError(
-            f"{path}: tree contains non-JSON values (quote dates and other scalars): {exc}"
-        ) from exc
     # Normalize YAML-1.1 boolean 'on' key: bare 'on:' in YAML parses as True key
     nodes = data.get("nodes", {})
     if isinstance(nodes, dict):
         for node in nodes.values():
             if isinstance(node, dict) and True in node and "on" not in node:
                 node["on"] = node.pop(True)
+    try:
+        # sort_keys=True deliberately: this must exercise exactly what
+        # Tree.content_hash() does later, so it also catches boolean keys
+        # that the node-level 'on:' normalization above doesn't reach (e.g.
+        # a nested `args: { on: x }`, which YAML-1.1 parses as {True: "x"}
+        # and which would otherwise crash content_hash()'s sorted json.dumps
+        # at tree_start instead of failing fast here at load time).
+        json.dumps(data, sort_keys=True)
+    except (TypeError, ValueError) as exc:
+        raise TreeLoadError(
+            f"{path}: tree contains non-JSON values (quote dates and other scalars): {exc}"
+        ) from exc
     try:
         tree = tree_from_dict(data)
     except TreeParseError as exc:

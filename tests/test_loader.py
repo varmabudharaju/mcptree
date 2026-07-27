@@ -111,3 +111,29 @@ nodes:
     p.write_text(text)
     with pytest.raises(TreeLoadError, match="non-JSON"):
         load_tree_file(p)
+
+
+def test_load_nested_boolean_key_rejected(tmp_path: Path) -> None:
+    """Regression: the YAML-1.1 'on' normalization only rewrites a node's
+    top-level 'on' key. A NESTED bare 'on:' (e.g. inside 'args') still
+    parses as the bool key True, which json.dumps(sort_keys=True) cannot
+    sort alongside string keys -- the same call Tree.content_hash() makes.
+    Must be rejected at load time, not crash later at tree_start."""
+    text = """
+mcptree: "0.1"
+id: mini
+title: Mini
+entry: go
+nodes:
+  go:
+    type: action
+    tool: t
+    args: { on: x, other: y }
+    result: { capture: r }
+    next: end
+  end: { type: terminal, outcome: ok, summary: fine }
+"""
+    p = tmp_path / "nested_bool_key.yaml"
+    p.write_text(text)
+    with pytest.raises(TreeLoadError, match="non-JSON"):
+        load_tree_file(p)
