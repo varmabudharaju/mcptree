@@ -5,7 +5,7 @@ from __future__ import annotations
 import json as _json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .models import (
     ActionNode,
@@ -61,7 +61,7 @@ class SessionState:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def resolve_path(facts: dict[str, object], path: str) -> object:
@@ -294,7 +294,7 @@ def submit(
             target = node.next
             _append(state, node.id, value, target)
     else:  # pragma: no cover - condition/terminal never await input
-        raise AssertionError(f"node {node.id} cannot accept submissions")
+        raise TypeError(f"node {node.id} cannot accept submissions")
 
     state.current_node = target
     state.step += 1

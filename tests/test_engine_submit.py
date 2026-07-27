@@ -60,7 +60,7 @@ def test_happy_path_action_condition_judgment() -> None:
     assert env["evidence"] == {"health": {"status": 503}}
     env = submit(state, 2, "oom", rationale="OOM lines in log")
     assert env["state"] == "done" and env["outcome"] == "remediate"
-    picked = [t for t in state.trace if t.node == "classify"][0]
+    picked = next(t for t in state.trace if t.node == "classify")
     assert picked.rationale == "OOM lines in log" and picked.input == "oom"
 
 
