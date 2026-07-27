@@ -87,3 +87,27 @@ def test_load_non_dict_top_level(tmp_path: Path) -> None:
     p.write_text("- 1\n- 2")
     with pytest.raises(TreeLoadError, match="top level"):
         load_tree_file(p)
+
+
+def test_load_unquoted_date_rejected(tmp_path: Path) -> None:
+    """Regression: yaml.safe_load turns an unquoted date into datetime.date,
+    which passes validation but is not JSON-serializable and would later
+    crash content_hash()/session serialization. Must be rejected at load."""
+    text = """
+mcptree: "0.1"
+id: mini
+title: Mini
+entry: go
+nodes:
+  go:
+    type: action
+    tool: t
+    args: { since: 2026-01-01 }
+    result: { capture: r }
+    next: end
+  end: { type: terminal, outcome: ok, summary: fine }
+"""
+    p = tmp_path / "date.yaml"
+    p.write_text(text)
+    with pytest.raises(TreeLoadError, match="non-JSON"):
+        load_tree_file(p)

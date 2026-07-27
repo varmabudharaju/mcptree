@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -58,7 +59,10 @@ class JsonSessionStore:
         return self.root / f"{safe}.json"
 
     def save(self, state: SessionState) -> None:
-        self._path(state.session_id).write_text(json.dumps(state_to_dict(state)))
+        path = self._path(state.session_id)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(state_to_dict(state)))
+        os.replace(tmp, path)
 
     def load(self, session_id: str) -> SessionState:
         p = self._path(session_id)

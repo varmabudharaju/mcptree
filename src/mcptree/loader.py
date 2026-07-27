@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import yaml
@@ -27,6 +28,15 @@ def load_tree_file(path: Path) -> Tree:
         raise TreeLoadError(f"{path}: invalid YAML: {exc}") from exc
     if not isinstance(data, dict):
         raise TreeLoadError(f"{path}: top level must be a mapping")
+    try:
+        # No sort_keys: YAML-1.1 bare 'on:' keys parse as bool True at this
+        # point (normalized just below) and sorting mixed bool/str keys
+        # raises TypeError unrelated to the non-JSON-value check below.
+        json.dumps(data)
+    except (TypeError, ValueError) as exc:
+        raise TreeLoadError(
+            f"{path}: tree contains non-JSON values (quote dates and other scalars): {exc}"
+        ) from exc
     # Normalize YAML-1.1 boolean 'on' key: bare 'on:' in YAML parses as True key
     nodes = data.get("nodes", {})
     if isinstance(nodes, dict):
