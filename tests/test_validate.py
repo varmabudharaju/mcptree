@@ -62,3 +62,23 @@ def test_no_terminal_node() -> None:
     }
     msgs = _messages(_tree({"go": loop}))
     assert any("terminal" in m for m in msgs)
+
+
+def test_ask_with_options_and_next_rejected() -> None:
+    """Regression: 'next' is ignored at runtime when 'options' is present, but the
+    validator used to follow it for reachability — hiding runtime-unreachable nodes."""
+    tree = _tree(
+        {
+            "go": {
+                "type": "ask",
+                "prompt": "?",
+                "next": "orphan",
+                "options": [{"id": "a", "then": "end"}],
+            },
+            "orphan": {"type": "terminal", "outcome": "x", "summary": "dead edge"},
+            "end": TERM,
+        }
+    )
+    messages = [i.message for i in validate_tree(tree)]
+    assert any("must not also have 'next'" in m for m in messages)
+    assert any("unreachable" in m for m in messages)

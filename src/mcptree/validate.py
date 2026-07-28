@@ -21,7 +21,7 @@ def _refs(node: Node) -> list[str]:
         return out
     if isinstance(node, AskNode):
         out = [o.then for o in node.options]
-        if node.next is not None:
+        if node.next is not None and not node.options:
             out.append(node.next)
         return out
     if isinstance(node, JudgmentNode):
@@ -46,6 +46,13 @@ def validate_tree(tree: Tree) -> list[ValidationIssue]:
         if isinstance(node, AskNode) and not node.options and not (node.capture and node.next):
             issues.append(
                 ValidationIssue(nid, "ask node needs 'options', or 'capture' plus 'next'")
+            )
+        if isinstance(node, AskNode) and node.options and node.next is not None:
+            issues.append(
+                ValidationIssue(
+                    nid,
+                    "ask node with 'options' must not also have 'next' (it is ignored at runtime)",
+                )
             )
 
     if not any(isinstance(n, TerminalNode) for n in tree.nodes.values()):
