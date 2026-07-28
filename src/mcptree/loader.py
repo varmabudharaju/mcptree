@@ -15,6 +15,20 @@ class TreeLoadError(Exception):
     """A tree file failed to parse or validate."""
 
 
+def _reject_non_string_keys(obj: object, path: str) -> None:
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if not isinstance(key, str):
+                raise TreeLoadError(
+                    f"non-string mapping key {key!r} at {path or 'top level'} — "
+                    "quote YAML boolean-like keys ('on', 'yes', ...) and other non-string scalars"
+                )
+            _reject_non_string_keys(value, f"{path}.{key}" if path else key)
+    elif isinstance(obj, list):
+        for i, item in enumerate(obj):
+            _reject_non_string_keys(item, f"{path}[{i}]")
+
+
 def load_tree_file(path: Path) -> Tree:
     try:
         text = path.read_text()
@@ -35,12 +49,13 @@ def load_tree_file(path: Path) -> Tree:
             if isinstance(node, dict) and True in node and "on" not in node:
                 node["on"] = node.pop(True)
     try:
+        _reject_non_string_keys(data, "")
+    except TreeLoadError as exc:
+        raise TreeLoadError(f"{path}: {exc}") from exc
+    try:
         # sort_keys=True deliberately: this must exercise exactly what
-        # Tree.content_hash() does later, so it also catches boolean keys
-        # that the node-level 'on:' normalization above doesn't reach (e.g.
-        # a nested `args: { on: x }`, which YAML-1.1 parses as {True: "x"}
-        # and which would otherwise crash content_hash()'s sorted json.dumps
-        # at tree_start instead of failing fast here at load time).
+        # Tree.content_hash() does later, so non-JSON values (dates etc.)
+        # fail fast here at load time instead of at tree_start.
         json.dumps(data, sort_keys=True)
     except (TypeError, ValueError) as exc:
         raise TreeLoadError(

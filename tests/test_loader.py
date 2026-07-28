@@ -135,5 +135,39 @@ nodes:
 """
     p = tmp_path / "nested_bool_key.yaml"
     p.write_text(text)
-    with pytest.raises(TreeLoadError, match="non-JSON"):
+    with pytest.raises(TreeLoadError, match="non-string mapping key"):
+        load_tree_file(p)
+
+
+NESTED_BOOL_SINGLE_KEY = """
+mcptree: "0.1"
+id: mini
+title: Mini
+entry: go
+nodes:
+  go:
+    type: action
+    tool: t
+    args: { on: x }
+    result: { capture: r }
+    next: end
+  end: { type: terminal, outcome: ok, summary: fine }
+"""
+
+
+def test_single_key_nested_boolean_rejected(tmp_path: Path) -> None:
+    """Regression: a single-key nested boolean mapping ({True: 'x'}) slips past
+    the sort_keys trick (nothing to compare against), so json.dumps silently
+    serializes the key as "true". Must be rejected explicitly."""
+    p = tmp_path / "single_bool_key.yaml"
+    p.write_text(NESTED_BOOL_SINGLE_KEY)
+    with pytest.raises(TreeLoadError, match="non-string mapping key"):
+        load_tree_file(p)
+
+
+def test_integer_key_rejected(tmp_path: Path) -> None:
+    """Integer keys serialize silently as strings too — reject with a path."""
+    p = tmp_path / "int_key.yaml"
+    p.write_text(NESTED_BOOL_SINGLE_KEY.replace("{ on: x }", "{ 200: x }"))
+    with pytest.raises(TreeLoadError, match=r"non-string mapping key 200 at nodes\.go\.args"):
         load_tree_file(p)
