@@ -204,12 +204,8 @@ def envelope(state: SessionState, error: str | None = None) -> dict[str, object]
     env_state, instruction, expects = _expects(node)
     base |= {"state": env_state, "instruction": instruction, "expects": expects}
     if isinstance(node, JudgmentNode):
-        base["evidence"] = {name: _present(state.facts.get(name)) for name in node.evidence}
+        base["evidence"] = {name: state.facts.get(name) for name in node.evidence}
     return base
-
-
-def _present(value: object) -> object:
-    return value if value is not None else None
 
 
 def check_schema(value: object, schema: dict[str, object]) -> str | None:

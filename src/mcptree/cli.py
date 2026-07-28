@@ -10,15 +10,19 @@ from .loader import TreeLoadError, load_tree_file
 from .models import ActionNode, AskNode, ConditionNode, JudgmentNode, TerminalNode, Tree
 
 
+def _esc(text: object) -> str:
+    return str(text).replace('"', "#quot;")
+
+
 def render_mermaid(tree: Tree) -> str:
     lines = ["flowchart TD"]
     for nid, node in tree.nodes.items():
         if isinstance(node, ConditionNode):
-            lines.append(f'  {nid}{{"{nid}<br/>on {node.on}"}}')
+            lines.append(f'  {nid}{{"{nid}<br/>on {_esc(node.on)}"}}')
         elif isinstance(node, TerminalNode):
-            lines.append(f'  {nid}(["{nid}<br/>{node.outcome}"])')
+            lines.append(f'  {nid}(["{nid}<br/>{_esc(node.outcome)}"])')
         elif isinstance(node, ActionNode):
-            lines.append(f'  {nid}["{nid}<br/>action: {node.tool}"]')
+            lines.append(f'  {nid}["{nid}<br/>action: {_esc(node.tool)}"]')
         elif isinstance(node, JudgmentNode):
             lines.append(f'  {nid}[["{nid}<br/>judgment"]]')
         elif isinstance(node, AskNode):
@@ -26,13 +30,13 @@ def render_mermaid(tree: Tree) -> str:
     for nid, node in tree.nodes.items():
         if isinstance(node, ConditionNode):
             for b in node.branches:
-                label = f"{b.when.op} {b.when.value}" if b.when.op != "exists" else "exists"
+                label = f"{b.when.op} {_esc(b.when.value)}" if b.when.op != "exists" else "exists"
                 lines.append(f"  {nid} -- {label} --> {b.then}")
             if node.default:
                 lines.append(f"  {nid} -- default --> {node.default}")
         elif isinstance(node, (AskNode, JudgmentNode)):
             for o in node.options:
-                lines.append(f"  {nid} -- {o.id} --> {o.then}")
+                lines.append(f"  {nid} -- {_esc(o.id)} --> {o.then}")
             if isinstance(node, AskNode) and node.next:
                 lines.append(f"  {nid} --> {node.next}")
         elif isinstance(node, ActionNode):
