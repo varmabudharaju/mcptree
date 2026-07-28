@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-
 from typing import cast
 
 from .loader import TreeLoadError, load_tree_file
