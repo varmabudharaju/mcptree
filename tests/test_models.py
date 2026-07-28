@@ -103,3 +103,58 @@ def test_action_and_judgment_and_ask_parse() -> None:
     assert j.require_rationale is True and j.evidence == ("logs",)
     q = t.nodes["q"]
     assert q.options[0].id == "yes" and q.capture == "sure" and q.next is None
+
+
+def _mini(nodes: dict[str, object], version: str = "0.2") -> dict[str, object]:
+    return {
+        "mcptree": version,
+        "id": "t",
+        "title": "T",
+        "entry": next(iter(nodes)),
+        "nodes": nodes,
+    }
+
+
+COMPOSITE_COND: dict[str, object] = {
+    "c": {
+        "type": "condition",
+        "on": "x",
+        "branches": [{"when": {"all": [{"gte": 1}, {"lte": 2}]}, "then": "end"}],
+        "default": "end",
+    },
+    "end": {"type": "terminal", "outcome": "done", "summary": "s"},
+}
+
+
+def test_composite_predicates_parse_in_02() -> None:
+    tree = tree_from_dict(_mini(COMPOSITE_COND))
+    pred = tree.nodes["c"].branches[0].when
+    assert pred.op == "all"
+    assert all(p.op in ("gte", "lte") for p in pred.value)
+
+
+def test_composite_predicates_rejected_in_01() -> None:
+    with pytest.raises(TreeParseError, match="requires mcptree 0.2"):
+        tree_from_dict(_mini(COMPOSITE_COND, version="0.1"))
+
+
+def test_not_takes_single_predicate() -> None:
+    nodes = dict(COMPOSITE_COND)
+    nodes["c"] = {
+        **COMPOSITE_COND["c"],
+        "branches": [{"when": {"not": {"eq": 200}}, "then": "end"}],
+    }
+    tree = tree_from_dict(_mini(nodes))
+    assert tree.nodes["c"].branches[0].when.op == "not"
+
+
+def test_all_requires_nonempty_list() -> None:
+    nodes = dict(COMPOSITE_COND)
+    nodes["c"] = {**COMPOSITE_COND["c"], "branches": [{"when": {"all": []}, "then": "end"}]}
+    with pytest.raises(TreeParseError, match="non-empty list"):
+        tree_from_dict(_mini(nodes))
+
+
+def test_version_03_still_rejected() -> None:
+    with pytest.raises(TreeParseError, match="unsupported spec version"):
+        tree_from_dict(_mini(COMPOSITE_COND, version="0.3"))

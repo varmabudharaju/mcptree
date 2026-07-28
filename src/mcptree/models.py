@@ -8,7 +8,11 @@ from dataclasses import dataclass, field
 
 SPEC_VERSION = "0.1"
 
+SUPPORTED_VERSIONS = frozenset({"0.1", "0.2"})
+
 PREDICATE_OPS = frozenset({"eq", "neq", "gt", "gte", "lt", "lte", "in", "exists"})
+
+COMPOSITE_OPS = frozenset({"all", "any", "not"})
 
 
 class TreeParseError(Exception):
@@ -127,10 +131,23 @@ def _opt_str(d: dict[str, object], key: str, ctx: str) -> str | None:
     return v
 
 
-def _parse_predicate(d: object, ctx: str) -> Predicate:
+def _parse_predicate(d: object, ctx: str, version: str) -> Predicate:
     if not isinstance(d, dict) or len(d) != 1:
         raise TreeParseError(f"{ctx}: 'when' must be a single-key mapping like {{eq: 200}}")
     op, value = next(iter(d.items()))
+    if op in COMPOSITE_OPS:
+        if version == "0.1":
+            raise TreeParseError(f"{ctx}: predicate '{op}' requires mcptree 0.2")
+        if op == "not":
+            return Predicate(op="not", value=_parse_predicate(value, f"{ctx}.not", version))
+        if not isinstance(value, list) or not value:
+            raise TreeParseError(f"{ctx}: '{op}' must be a non-empty list of predicates")
+        return Predicate(
+            op=str(op),
+            value=tuple(
+                _parse_predicate(p, f"{ctx}.{op}[{i}]", version) for i, p in enumerate(value)
+            ),
+        )
     if op not in PREDICATE_OPS:
         raise TreeParseError(f"{ctx}: unknown predicate op '{op}'")
     return Predicate(op=str(op), value=value)
@@ -147,7 +164,7 @@ def _parse_options(raw: object, ctx: str) -> list[tuple[str, str]]:
     return out
 
 
-def _parse_node(node_id: str, d: object) -> Node:
+def _parse_node(node_id: str, d: object, version: str) -> Node:
     ctx = f"node '{node_id}'"
     if not isinstance(d, dict):
         raise TreeParseError(f"{ctx}: must be a mapping")
@@ -158,7 +175,9 @@ def _parse_node(node_id: str, d: object) -> Node:
             raise TreeParseError(f"{ctx}: 'branches' must be a non-empty list")
         branches = tuple(
             Branch(
-                when=_parse_predicate(_req(b, "when", f"{ctx}.branches[{i}]"), f"{ctx}.branches[{i}]"),
+                when=_parse_predicate(
+                    _req(b, "when", f"{ctx}.branches[{i}]"), f"{ctx}.branches[{i}]", version
+                ),
                 then=_str(b, "then", f"{ctx}.branches[{i}]"),
             )
             for i, b in enumerate(raw_branches)
@@ -220,15 +239,17 @@ def _fail(msg: str) -> bool:
 
 def tree_from_dict(d: dict[str, object]) -> Tree:
     version = _str(d, "mcptree", "tree")
-    if version != SPEC_VERSION:
-        raise TreeParseError(f"unsupported spec version '{version}' (this build supports {SPEC_VERSION})")
+    if version not in SUPPORTED_VERSIONS:
+        raise TreeParseError(
+            f"unsupported spec version '{version}' (this build supports {sorted(SUPPORTED_VERSIONS)})"
+        )
     raw_nodes = _req(d, "nodes", "tree")
     if not isinstance(raw_nodes, dict) or not raw_nodes:
         raise TreeParseError("tree: 'nodes' must be a non-empty mapping")
     max_steps = d.get("max_steps", 50)
     if not isinstance(max_steps, int) or isinstance(max_steps, bool) or max_steps < 1:
         raise TreeParseError("tree: 'max_steps' must be a positive integer")
-    nodes = {str(nid): _parse_node(str(nid), nd) for nid, nd in raw_nodes.items()}
+    nodes = {str(nid): _parse_node(str(nid), nd, version) for nid, nd in raw_nodes.items()}
     return Tree(
         spec_version=version,
         id=_str(d, "id", "tree"),

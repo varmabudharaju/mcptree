@@ -6,6 +6,7 @@ import json as _json
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import cast
 
 from .models import (
     ActionNode,
@@ -76,6 +77,14 @@ def resolve_path(facts: dict[str, object], path: str) -> object:
 def evaluate(pred: Predicate, value: object) -> bool:
     if pred.op == "exists":
         return value is not MISSING
+    # Composites recurse before the MISSING short-circuit: leaves are false on a
+    # missing fact (except exists), so e.g. `not: {eq: 1}` on a missing fact is true.
+    if pred.op == "all":
+        return all(evaluate(p, value) for p in cast("tuple[Predicate, ...]", pred.value))
+    if pred.op == "any":
+        return any(evaluate(p, value) for p in cast("tuple[Predicate, ...]", pred.value))
+    if pred.op == "not":
+        return not evaluate(cast("Predicate", pred.value), value)
     if value is MISSING:
         return False
     try:
