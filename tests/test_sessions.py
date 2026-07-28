@@ -72,3 +72,20 @@ def test_pinned_tree_survives_source_change(tmp_path: Path) -> None:
     loaded = store.load(state.session_id)
     env = submit(loaded, 1, {"v": 2})
     assert env["outcome"] == "ok"
+
+
+def test_malformed_session_id_rejected_not_collided(tmp_path: Path) -> None:
+    """Regression: 'ses_a.b/c' used to sanitize to the same file as 'ses_abc' —
+    a malformed id could silently load someone else's session. Must raise."""
+    store = JsonSessionStore(tmp_path)
+    (tmp_path / "ses_abc.json").write_text("{}")  # collision target the old code would read
+    for bad in ("ses_a.b/c", "ses_ABC", "ses_../../etc", "notasession", "ses_abc"):
+        with pytest.raises(UnknownSessionError):
+            store.load(bad)
+
+
+def test_save_with_malformed_id_rejected(tmp_path: Path) -> None:
+    store = JsonSessionStore(tmp_path)
+    state = start(tree_from_dict(TREE_DICT), session_id="ses_not-hex-here")
+    with pytest.raises(UnknownSessionError):
+        store.save(state)

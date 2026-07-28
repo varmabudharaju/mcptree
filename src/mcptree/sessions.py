@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -43,6 +44,9 @@ def state_from_dict(d: dict[str, object]) -> SessionState:
     )
 
 
+_SESSION_ID_RE = re.compile(r"^ses_[0-9a-f]{12}$")
+
+
 class SessionStore(Protocol):
     def save(self, state: SessionState) -> None: ...
     def load(self, session_id: str) -> SessionState: ...
@@ -55,8 +59,9 @@ class JsonSessionStore:
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _path(self, session_id: str) -> Path:
-        safe = "".join(c for c in session_id if c.isalnum() or c == "_")
-        return self.root / f"{safe}.json"
+        if not _SESSION_ID_RE.fullmatch(session_id):
+            raise UnknownSessionError(f"unknown session '{session_id}'")
+        return self.root / f"{session_id}.json"
 
     def save(self, state: SessionState) -> None:
         path = self._path(state.session_id)
