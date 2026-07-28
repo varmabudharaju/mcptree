@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json as _json
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import cast
 
 from .models import (
+    PLACEHOLDER_RE,
     ActionNode,
     AskNode,
     ConditionNode,
@@ -105,6 +107,28 @@ def evaluate(pred: Predicate, value: object) -> bool:
     except TypeError:
         return False
     return False
+
+
+def interpolate(value: object, facts: dict[str, object]) -> object:
+    """Resolve {{ path }} placeholders from facts. Missing facts stay verbatim."""
+    if isinstance(value, str):
+        whole = PLACEHOLDER_RE.fullmatch(value.strip())
+        if whole:
+            resolved = resolve_path(facts, whole.group(1))
+            return value if resolved is MISSING else resolved
+
+        def _sub(m: re.Match[str]) -> str:
+            v = resolve_path(facts, m.group(1))
+            if v is MISSING:
+                return m.group(0)
+            return v if isinstance(v, str) else _json.dumps(v, separators=(",", ":"))
+
+        return PLACEHOLDER_RE.sub(_sub, value)
+    if isinstance(value, dict):
+        return {k: interpolate(v, facts) for k, v in value.items()}
+    if isinstance(value, list):
+        return [interpolate(v, facts) for v in value]
+    return value
 
 
 def _append(state: SessionState, node: str, input_: object, branch: str | None,
@@ -204,13 +228,20 @@ def envelope(state: SessionState, error: str | None = None) -> dict[str, object]
         "outcome": state.outcome,
         "evidence": {},
     }
+    interp = state.tree.spec_version != "0.1"  # 0.1 documents stay verbatim
     if state.done:
         node = state.tree.nodes[state.current_node]
         summary = node.summary if isinstance(node, TerminalNode) else ""
+        if interp:
+            summary = cast(str, interpolate(summary, state.facts))
         base |= {"state": "done", "instruction": summary, "expects": None}
         return base
     node = state.tree.nodes[state.current_node]
     env_state, instruction, expects = _expects(node)
+    if interp:
+        instruction = cast(str, interpolate(instruction, state.facts))
+        if expects.get("kind") == "tool_result":
+            expects = {**expects, "args": interpolate(expects["args"], state.facts)}
     base |= {"state": env_state, "instruction": instruction, "expects": expects}
     if isinstance(node, JudgmentNode):
         base["evidence"] = {name: state.facts.get(name) for name in node.evidence}

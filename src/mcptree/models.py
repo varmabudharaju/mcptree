@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 
 SPEC_VERSION = "0.1"
@@ -13,6 +14,8 @@ SUPPORTED_VERSIONS = frozenset({"0.1", "0.2"})
 PREDICATE_OPS = frozenset({"eq", "neq", "gt", "gte", "lt", "lte", "in", "exists"})
 
 COMPOSITE_OPS = frozenset({"all", "any", "not"})
+
+PLACEHOLDER_RE = re.compile(r"\{\{\s*([A-Za-z_]\w*(?:\.\w+)*)\s*\}\}")
 
 
 class TreeParseError(Exception):
