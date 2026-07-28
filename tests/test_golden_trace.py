@@ -44,3 +44,46 @@ def test_golden_trace_maintenance_path() -> None:
     assert env["node"] == "ask_maintenance" and env["state"] == "awaiting_answer"
     env = submit(state, 2, "yes")
     assert env["outcome"] == "resolved"
+
+
+DEPLOY_PATH = Path(__file__).parent.parent / "trees" / "deploy.yaml"
+
+
+def test_deploy_tree_loads() -> None:
+    assert load_tree_file(DEPLOY_PATH).id == "deploy-gate"
+
+
+def test_golden_trace_deploy_unrelated_failures() -> None:
+    """ask(service) -> interpolated action -> all-band -> judgment capture -> condition -> approved."""
+    state = start(load_tree_file(DEPLOY_PATH))
+    assert state.current_node == "which_service"
+
+    env = submit(state, 1, "checkout-api")
+    assert env["node"] == "check_ci"
+    assert env["expects"]["args"] == {"service": "checkout-api"}  # interpolated
+
+    env = submit(state, 2, {"recent_failures": 2})
+    assert env["node"] == "assess_risk"
+    assert "2 recent failure(s) for checkout-api" in env["instruction"]  # interpolated prompt
+
+    env = submit(state, 3, "unrelated", rationale="failures are flaky e2e, unrelated to diff")
+    assert env["state"] == "done" and env["outcome"] == "approved"
+    assert env["instruction"] == "Deploy checkout-api: approved."  # interpolated summary
+
+    golden = [
+        ("which_service", "check_ci", "tree_answer"),
+        ("check_ci", "gate_on_failures", "tree_answer"),
+        ("gate_on_failures", "assess_risk", None),
+        ("assess_risk", "route_risk", "tree_answer"),
+        ("route_risk", "approve", None),
+        ("approve", None, None),
+    ]
+    assert [(t.node, t.resolved_branch, t.source) for t in state.trace] == golden
+    assert state.facts["risk"] == "unrelated"
+
+
+def test_golden_trace_deploy_zero_failures_fast_approve() -> None:
+    state = start(load_tree_file(DEPLOY_PATH))
+    submit(state, 1, "search")
+    env = submit(state, 2, {"recent_failures": 0})
+    assert env["state"] == "done" and env["outcome"] == "approved"

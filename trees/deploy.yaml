@@ -1,0 +1,56 @@
+mcptree: "0.2"
+id: deploy-gate
+title: Production deploy gate
+entry: which_service
+
+nodes:
+  which_service:
+    type: ask
+    prompt: Which service is being deployed?
+    capture: service
+    next: check_ci
+
+  check_ci:
+    type: action
+    tool: ci_status
+    args: { service: "{{ service }}" }
+    result: { capture: ci }
+    next: gate_on_failures
+
+  gate_on_failures:
+    type: condition
+    on: ci.recent_failures
+    branches:
+      - when: { all: [ { gte: 1 }, { lte: 2 } ] }
+        then: assess_risk
+      - when: { gt: 2 }
+        then: block
+    default: approve
+
+  assess_risk:
+    type: judgment
+    prompt: "CI shows {{ ci.recent_failures }} recent failure(s) for {{ service }}. Are they related to this change?"
+    evidence: [ci]
+    options:
+      - { id: related,   then: route_risk }
+      - { id: unrelated, then: route_risk }
+    capture: risk
+    require_rationale: true
+
+  route_risk:
+    type: condition
+    on: risk
+    branches:
+      - when: { eq: unrelated }
+        then: approve
+    default: block
+
+  approve:
+    type: terminal
+    outcome: approved
+    summary: "Deploy {{ service }}: approved."
+
+  block:
+    type: terminal
+    outcome: blocked
+    summary: "Deploy {{ service }}: blocked; resolve CI failures first."
