@@ -117,3 +117,17 @@ def test_max_steps_aborts_runaway_loop() -> None:
     state = start(t)
     assert state.done and state.outcome == "aborted:max_steps"
     assert len(state.trace) <= 6
+
+
+def test_evaluate_composites() -> None:
+    band = Predicate(op="all", value=(Predicate("gte", 1), Predicate("lte", 2)))
+    assert evaluate(band, 2) and not evaluate(band, 3)
+    either = Predicate(op="any", value=(Predicate("eq", 200), Predicate("eq", 204)))
+    assert evaluate(either, 204) and not evaluate(either, 500)
+    assert evaluate(Predicate(op="not", value=Predicate("eq", 1)), 2)
+
+
+def test_not_on_missing_fact_is_true() -> None:
+    """Documented consequence: leaves are false on MISSING, so not(leaf) is true."""
+    assert evaluate(Predicate(op="not", value=Predicate("eq", 1)), MISSING)
+    assert not evaluate(Predicate(op="all", value=(Predicate("eq", 1),)), MISSING)
