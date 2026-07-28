@@ -270,7 +270,7 @@ def submit(
             target = node.next
         else:
             target = next(o.then for o in node.options if o.id == value)
-        if isinstance(node, AskNode) and node.capture:
+        if node.capture:
             state.facts[node.capture] = value
         _append(state, node.id, value, target, rationale)
     elif isinstance(node, ActionNode):

@@ -168,3 +168,24 @@ def test_free_text_ask_too_large_rejected() -> None:
     assert env["error"].startswith("fact_too_large")
     assert env["node"] == "ask_notes" and env["step"] == 1
     assert "notes" not in state.facts
+
+
+def test_judgment_capture_feeds_condition() -> None:
+    tree = tree_from_dict(
+        {
+            "mcptree": "0.2", "id": "t", "title": "T", "entry": "j",
+            "nodes": {
+                "j": {"type": "judgment", "prompt": "?", "capture": "verdict",
+                      "options": [{"id": "good", "then": "route"},
+                                  {"id": "bad", "then": "route"}]},
+                "route": {"type": "condition", "on": "verdict",
+                          "branches": [{"when": {"eq": "good"}, "then": "ok"}],
+                          "default": "no"},
+                "ok": {"type": "terminal", "outcome": "approved", "summary": "s"},
+                "no": {"type": "terminal", "outcome": "blocked", "summary": "s"},
+            },
+        }
+    )
+    state = start(tree)
+    env = submit(state, 1, "good")
+    assert env["outcome"] == "approved" and state.facts["verdict"] == "good"
