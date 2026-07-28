@@ -20,6 +20,11 @@ The division of labor: **the agent does the acting, the tree does the
 deciding.** Every step is recorded in an append-only trace, so "why did the
 agent escalate this?" always has an answer.
 
+One honest boundary: the engine is deterministic *given reported inputs*. Tool
+results are reported by the agent, not observed by the server — the trace records
+what was reported and through which channel (elicited human answers are marked
+`source: "elicitation"`), so it is testimony you can audit, not surveillance.
+
 - [`SPEC.md`](SPEC.md) — the normative wire protocol (v0.1), for anyone
   implementing a conforming server or client in any language.
 - [`docs/use-case.md`](docs/use-case.md) — a captioned walkthrough of the

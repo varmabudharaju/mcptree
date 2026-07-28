@@ -43,6 +43,30 @@ A **conforming client (agent)**:
 Everything below is normative for the wire behavior. Implementation details not
 observable on the wire (e.g. internal data structures) are non-normative.
 
+### 1.1 Trust model & determinism boundary
+
+mcptree's determinism claim is precise and bounded: **given the same reported
+inputs, the engine always takes the same path.** What it does not — and cannot —
+claim:
+
+- **`action` results are agent-reported and unverified.** The server never
+  observes the agent's real tool calls; an agent can report a result it never
+  obtained. The trace is an honest record of *what was reported through which
+  channel*, not proof of what happened in the world.
+- **`ask` answers reach the human only when the client supports elicitation**
+  (§5.8). When elicitation is unavailable or declined, the agent relays the
+  question, and the answer is only as trustworthy as the agent. The trace's
+  `source` field (§5.5) records the channel — `"elicitation"` (the client's
+  own human-facing prompt, which the model cannot fabricate) versus
+  `"tree_answer"` (agent-submitted) — so an auditor can tell the difference.
+- **Client conformance is cooperative.** Nothing server-side forces an agent to
+  start a tree or to keep answering it. mcptree constrains *how* decisions are
+  made once a tree is being walked; it does not compel the walk.
+
+Deployments that need stronger guarantees should treat the trace as testimony,
+not evidence: corroborate reported tool results out-of-band (e.g. server-side
+logs of the real systems) before acting on high-stakes outcomes.
+
 ---
 
 ## 2. Tree document format
