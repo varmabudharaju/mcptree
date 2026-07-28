@@ -15,8 +15,8 @@ shots:
     rows: 6
     alt: >-
       mcptree validate trees/ — lints every tree in the directory (node types,
-      required fields, dangling refs) and fails fast on the first error;
-      incident-triage passes.
+      required fields, dangling refs, 0.2 placeholder lint); both the 0.1
+      incident-triage tree and the 0.2 deploy-gate tree pass.
 
   - name: mcptree-viz
     kind: cli
@@ -27,6 +27,17 @@ shots:
       mcptree viz trees/incident.yaml — the incident-triage tree rendered as a
       Mermaid flowchart: all five node types (action, condition, judgment, ask,
       terminal) and branch labels, generated straight from the YAML.
+
+  - name: mcptree-viz-deploy
+    kind: cli
+    command: "mcptree viz trees/deploy.yaml"
+    cols: 100
+    rows: 24
+    alt: >-
+      mcptree viz trees/deploy.yaml — the 0.2 deploy-gate tree rendered as a
+      Mermaid flowchart: the interpolated ci_status action, the all-composite
+      failure band on the condition, and the captured judgment (risk) feeding
+      the route_risk condition.
 
   - name: incident-demo
     kind: session

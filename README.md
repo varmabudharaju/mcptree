@@ -25,7 +25,7 @@ results are reported by the agent, not observed by the server — the trace reco
 what was reported and through which channel (elicited human answers are marked
 `source: "elicitation"`), so it is testimony you can audit, not surveillance.
 
-- [`SPEC.md`](SPEC.md) — the normative wire protocol (v0.1), for anyone
+- [`SPEC.md`](SPEC.md) — the normative wire protocol (v0.2), for anyone
   implementing a conforming server or client in any language.
 - [`docs/use-case.md`](docs/use-case.md) — a captioned walkthrough of the
   incident tree below, call by call, with real envelope JSON.
@@ -40,9 +40,9 @@ process run later — resumes the exact same session by id, reports the logs,
 makes the judgment call, and reaches `outcome: remediate` with the full audit
 trace. Real terminal output, no mocking:
 
-<img src="docs/screenshots/03-demo-phase1-start.png" width="100%" alt="Process 1 (phase1): tree_start opens a session on incident-triage, tree_answer reports a 503 health check and auto-advances to inspect_logs, then the process exits."/>
+<img src="docs/screenshots/04-demo-phase1-start.png" width="100%" alt="Process 1 (phase1): tree_start opens a session on incident-triage, tree_answer reports a 503 health check and auto-advances to inspect_logs, then the process exits."/>
 
-<img src="docs/screenshots/04-demo-phase2-resume.png" width="100%" alt="Process 2 (phase2), a brand-new OS process: tree_status resumes the same session_id from disk, reports OOM logs, classifies the error, reaches outcome: remediate, and tree_trace prints the full audit path."/>
+<img src="docs/screenshots/05-demo-phase2-resume.png" width="100%" alt="Process 2 (phase2), a brand-new OS process: tree_status resumes the same session_id from disk, reports OOM logs, classifies the error, reaches outcome: remediate, and tree_trace prints the full audit path."/>
 
 Run it yourself: `python3 examples/incident_response.py phase1`, then in a
 *separate* invocation `python3 examples/incident_response.py phase2 <session_id>`
@@ -153,6 +153,26 @@ flowchart TD
   ask_maintenance -- no --> escalate
 ```
 
+## What 0.2 adds
+
+- **Asks reach the human.** When the client supports MCP elicitation, `ask`
+  prompts go straight to the human via the client's own UI, recorded in the
+  trace as `source: "elicitation"` — the model can no longer silently answer
+  the human's questions. Unsupported or declined → the agent relays, exactly
+  as before. Opt out with `DecisionTrees(..., elicit=False)` or
+  `mcptree serve --no-elicit`. (SPEC §5.8)
+- **Data flows into actions.** `{{ path }}` placeholders in action args,
+  prompts, and terminal summaries resolve from captured facts — runbooks
+  parameterized by what they learn. (SPEC §2.9)
+- **Composite predicates.** `all:` / `any:` / `not:` compose the leaf
+  operators, e.g. `when: { all: [ { gte: 1 }, { lte: 2 } ] }`. (SPEC §2.4)
+- **Judgment capture.** A judgment's chosen option can be captured as a fact
+  and branched on downstream. (SPEC §2.3)
+
+All four live in [`trees/deploy.yaml`](trees/deploy.yaml), a production deploy
+gate with its own golden-trace tests. Trees declaring `mcptree: "0.1"` (like
+the incident tree above) still load and behave exactly as before.
+
 ## An envelope walk
 
 Every `tree_start`/`tree_answer`/`tree_status` call returns one self-describing
@@ -237,6 +257,6 @@ step and the full audit trace.
 
 ## Status
 
-v0.1. Python 3.11+, MIT licensed. Runtime dependencies: `fastmcp` and `pyyaml`.
-56 tests passing (`python3 -m pytest`). See [`SPEC.md`](SPEC.md) for the full
+v0.2. Python 3.11+, MIT licensed. Runtime dependencies: `fastmcp` and `pyyaml`.
+91 tests passing (`python3 -m pytest`). See [`SPEC.md`](SPEC.md) for the full
 protocol and [`docs/use-case.md`](docs/use-case.md) for the end-to-end walk.

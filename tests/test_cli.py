@@ -53,3 +53,10 @@ def test_mermaid_escapes_quotes() -> None:
     )
     out = render_mermaid(tree)
     assert '"quoted"' not in out and "#quot;quoted#quot;" in out
+
+
+def test_mermaid_composite_predicate_labels() -> None:
+    tree = load_tree_file(Path(__file__).parent.parent / "trees" / "deploy.yaml")
+    out = render_mermaid(tree)
+    assert "all(gte 1, lte 2)" in out
+    assert "Predicate(" not in out
