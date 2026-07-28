@@ -189,3 +189,17 @@ def test_judgment_capture_feeds_condition() -> None:
     state = start(tree)
     env = submit(state, 1, "good")
     assert env["outcome"] == "approved" and state.facts["verdict"] == "good"
+
+
+def test_trace_records_source_channel() -> None:
+    state = start(incident_tree())
+    submit(state, 1, {"status": 503})
+    by_node = {t.node: t.source for t in state.trace}
+    assert by_node["check"] == "tree_answer"  # a submission
+    assert by_node["route"] is None  # auto-advanced
+
+
+def test_submit_source_override() -> None:
+    state = start(incident_tree())
+    submit(state, 1, {"status": 503}, source="elicitation")
+    assert state.trace[0].source == "elicitation"

@@ -89,3 +89,19 @@ def test_save_with_malformed_id_rejected(tmp_path: Path) -> None:
     state = start(tree_from_dict(TREE_DICT), session_id="ses_not-hex-here")
     with pytest.raises(UnknownSessionError):
         store.save(state)
+
+
+def test_pre_source_session_files_still_load(tmp_path: Path) -> None:
+    """Simulate a v0.1-era session file (no 'source' on trace entries)."""
+    import json
+
+    store = JsonSessionStore(tmp_path)
+    state = start(tree_from_dict(TREE_DICT), session_id="ses_0123456789ab")
+    submit(state, 1, {"v": 1})
+    store.save(state)
+    raw = json.loads((tmp_path / "ses_0123456789ab.json").read_text())
+    for entry in raw["trace"]:
+        entry.pop("source", None)
+    (tmp_path / "ses_0123456789ab.json").write_text(json.dumps(raw))
+    loaded = store.load("ses_0123456789ab")
+    assert all(t.source is None for t in loaded.trace)
