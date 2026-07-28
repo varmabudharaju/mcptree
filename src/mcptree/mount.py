@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from pathlib import Path
 
+import anyio
 from fastmcp import FastMCP
 
 from .engine import UnknownTreeError, envelope, start, submit
@@ -23,14 +24,16 @@ class DecisionTrees:
         self.trees = load_trees_dir(Path(trees_dir))  # fail fast on invalid trees
         root = Path(sessions_dir) if sessions_dir else Path.home() / ".mcptree" / "sessions"
         self.store: SessionStore = JsonSessionStore(root)
+        self._lock = anyio.Lock()  # serializes submissions in-process (SPEC §5.7)
         self._register(mcp)
 
     def _register(self, mcp: FastMCP) -> None:
         trees = self.trees
         store = self.store
+        lock = self._lock
 
         @mcp.tool
-        def tree_list() -> list[dict[str, str]]:
+        async def tree_list() -> list[dict[str, str]]:
             """List published decision trees."""
             return [
                 {"id": t.id, "title": t.title, "description": t.description}
@@ -38,7 +41,7 @@ class DecisionTrees:
             ]
 
         @mcp.tool
-        def tree_start(tree_id: str) -> dict[str, object]:
+        async def tree_start(tree_id: str) -> dict[str, object]:
             """Start a session on a decision tree; returns the first step envelope."""
             if tree_id not in trees:
                 raise UnknownTreeError(
@@ -49,7 +52,7 @@ class DecisionTrees:
             return envelope(state)
 
         @mcp.tool
-        def tree_answer(
+        async def tree_answer(
             session_id: str,
             step: int,
             value: object,
@@ -57,18 +60,19 @@ class DecisionTrees:
             is_error: bool = False,
         ) -> dict[str, object]:
             """Submit what the current envelope asked for; returns the next envelope."""
-            state = store.load(session_id)
-            env = submit(state, step, value, rationale=rationale, is_error=is_error)
-            store.save(state)
+            async with lock:
+                state = store.load(session_id)
+                env = submit(state, step, value, rationale=rationale, is_error=is_error)
+                store.save(state)
             return env
 
         @mcp.tool
-        def tree_status(session_id: str) -> dict[str, object]:
+        async def tree_status(session_id: str) -> dict[str, object]:
             """Re-fetch the current step envelope (idempotent; use to resume)."""
             return envelope(store.load(session_id))
 
         @mcp.tool
-        def tree_trace(session_id: str) -> dict[str, object]:
+        async def tree_trace(session_id: str) -> dict[str, object]:
             """Full audit trail for a session."""
             state = store.load(session_id)
             return {

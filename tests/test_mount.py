@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -110,3 +111,31 @@ def test_invalid_tree_dir_fails_fast(tmp_path: Path) -> None:
     mcp = FastMCP("x")
     with pytest.raises(Exception, match="ghost"):
         DecisionTrees(mcp, trees, sessions_dir=tmp_path / "s")
+
+
+async def test_concurrent_answers_advance_exactly_once(dirs: tuple[Path, Path]) -> None:
+    """N racing answers for the same step: exactly one wins, the rest get step_mismatch."""
+    mcp = make_server(dirs)
+    async with Client(mcp) as client:
+        env = payload(await client.call_tool("tree_start", {"tree_id": "mini"}))
+        sid = env["session_id"]
+        results = await asyncio.gather(
+            *(
+                client.call_tool(
+                    "tree_answer",
+                    {"session_id": sid, "step": 1, "value": {"status": 200}},
+                )
+                for _ in range(10)
+            )
+        )
+        envs = [payload(r) for r in results]
+        winners = [e for e in envs if e["error"] is None]
+        # the winner drives this tree to done, so racers are rejected either as
+        # step_mismatch (lost the race mid-flight) or finished_session (lost after done)
+        losers = [
+            e for e in envs
+            if e["error"] and e["error"].split(":")[0] in ("step_mismatch", "finished_session")
+        ]
+        assert len(winners) == 1 and len(losers) == 9
+        status = payload(await client.call_tool("tree_status", {"session_id": sid}))
+        assert status["state"] == "done" and status["outcome"] == "resolved"
