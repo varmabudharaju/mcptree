@@ -158,3 +158,23 @@ def test_all_requires_nonempty_list() -> None:
 def test_version_03_still_rejected() -> None:
     with pytest.raises(TreeParseError, match="unsupported spec version"):
         tree_from_dict(_mini(COMPOSITE_COND, version="0.3"))
+
+
+JUDGE_CAPTURE: dict[str, object] = {
+    "j": {
+        "type": "judgment",
+        "prompt": "?",
+        "capture": "verdict",
+        "options": [{"id": "a", "then": "end"}],
+    },
+    "end": {"type": "terminal", "outcome": "done", "summary": "s"},
+}
+
+
+def test_judgment_capture_parses_in_02() -> None:
+    assert tree_from_dict(_mini(JUDGE_CAPTURE)).nodes["j"].capture == "verdict"
+
+
+def test_judgment_capture_rejected_in_01() -> None:
+    with pytest.raises(TreeParseError, match="requires mcptree 0.2"):
+        tree_from_dict(_mini(JUDGE_CAPTURE, version="0.1"))

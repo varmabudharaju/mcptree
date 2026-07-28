@@ -69,6 +69,7 @@ class JudgmentNode:
     evidence: tuple[str, ...]
     options: tuple[JudgmentOption, ...]
     require_rationale: bool
+    capture: str | None = None
     type: str = "judgment"
 
 
@@ -205,9 +206,12 @@ def _parse_node(node_id: str, d: object, version: str) -> Node:
         rr = d.get("require_rationale", False)
         if not isinstance(rr, bool):
             raise TreeParseError(f"{ctx}: 'require_rationale' must be a boolean")
+        capture = _opt_str(d, "capture", ctx)
+        if capture is not None and version == "0.1":
+            raise TreeParseError(f"{ctx}: 'capture' on judgment requires mcptree 0.2")
         return JudgmentNode(
             id=node_id, prompt=_str(d, "prompt", ctx), evidence=tuple(raw_ev), options=opts,
-            require_rationale=rr,
+            require_rationale=rr, capture=capture,
         )
     if ntype == "action":
         result = d.get("result", {})
