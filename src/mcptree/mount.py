@@ -53,7 +53,7 @@ class DecisionTrees:
                     )
                 else:
                     result = await ctx.elicit(message, response_type=str)  # type: ignore[arg-type]
-            except Exception:
+            except Exception:  # noqa: BLE001 — any client-side elicit failure means fall back
                 return env  # client lacks elicitation; the agent relays instead
             if not isinstance(result, AcceptedElicitation):
                 return env  # declined/cancelled: fall back to the agent path
