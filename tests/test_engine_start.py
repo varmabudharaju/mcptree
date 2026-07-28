@@ -131,3 +131,45 @@ def test_not_on_missing_fact_is_true() -> None:
     """Documented consequence: leaves are false on MISSING, so not(leaf) is true."""
     assert evaluate(Predicate(op="not", value=Predicate("eq", 1)), MISSING)
     assert not evaluate(Predicate(op="all", value=(Predicate("eq", 1),)), MISSING)
+
+
+def test_interpolate_unit() -> None:
+    from mcptree.engine import interpolate
+
+    facts: dict[str, object] = {"svc": "api", "ci": {"fails": 2, "tags": ["a"]}}
+    assert interpolate("{{ svc }}", facts) == "api"
+    assert interpolate("{{ ci.fails }}", facts) == 2  # whole-string keeps type
+    assert interpolate("Deploy {{ svc }}: {{ ci.fails }} fails", facts) == "Deploy api: 2 fails"
+    assert interpolate("tags={{ ci.tags }}", facts) == 'tags=["a"]'
+    assert interpolate("{{ missing.path }}", facts) == "{{ missing.path }}"  # verbatim
+    assert interpolate({"a": ["{{ svc }}"]}, facts) == {"a": ["api"]}
+
+
+INTERP_TREE: dict[str, object] = {
+    "mcptree": "0.2", "id": "t", "title": "T", "entry": "who",
+    "nodes": {
+        "who": {"type": "ask", "prompt": "Which service?", "capture": "svc", "next": "act"},
+        "act": {"type": "action", "tool": "get_logs", "args": {"service": "{{ svc }}"},
+                "result": {"capture": "logs"}, "next": "end"},
+        "end": {"type": "terminal", "outcome": "done", "summary": "Done with {{ svc }}."},
+    },
+}
+
+
+def test_envelope_interpolates_in_02() -> None:
+    from mcptree.engine import submit
+
+    state = start(tree_from_dict(INTERP_TREE))
+    env = submit(state, 1, "checkout")
+    assert env["expects"]["args"] == {"service": "checkout"}
+    env = submit(state, 2, {"ok": True})
+    assert env["instruction"] == "Done with checkout."
+
+
+def test_01_documents_stay_verbatim() -> None:
+    from mcptree.engine import submit
+
+    raw = {**INTERP_TREE, "mcptree": "0.1"}
+    state = start(tree_from_dict(raw))
+    env = submit(state, 1, "checkout")
+    assert env["expects"]["args"] == {"service": "{{ svc }}"}

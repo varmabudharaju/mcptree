@@ -82,3 +82,28 @@ def test_ask_with_options_and_next_rejected() -> None:
     messages = [i.message for i in validate_tree(tree)]
     assert any("must not also have 'next'" in m for m in messages)
     assert any("unreachable" in m for m in messages)
+
+
+def test_placeholder_unknown_capture_rejected() -> None:
+    raw: dict[str, object] = {
+        "mcptree": "0.2", "id": "t", "title": "T", "entry": "act",
+        "nodes": {
+            "act": {"type": "action", "tool": "x", "args": {"s": "{{ nope.deep }}"},
+                    "next": "end"},
+            "end": {"type": "terminal", "outcome": "done", "summary": "s"},
+        },
+    }
+    messages = [i.message for i in validate_tree(tree_from_dict(raw))]
+    assert any("unknown capture 'nope'" in m for m in messages)
+
+
+def test_placeholder_lint_skipped_for_01() -> None:
+    """0.1 docs never interpolate, so strings that look like placeholders are fine."""
+    raw: dict[str, object] = {
+        "mcptree": "0.1", "id": "t", "title": "T", "entry": "act",
+        "nodes": {
+            "act": {"type": "action", "tool": "x", "args": {"s": "{{ nope }}"}, "next": "end"},
+            "end": {"type": "terminal", "outcome": "done", "summary": "s"},
+        },
+    }
+    assert validate_tree(tree_from_dict(raw)) == []

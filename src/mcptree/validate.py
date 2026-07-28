@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import ActionNode, AskNode, ConditionNode, JudgmentNode, Node, TerminalNode, Tree
+from .models import (
+    PLACEHOLDER_RE,
+    ActionNode,
+    AskNode,
+    ConditionNode,
+    JudgmentNode,
+    Node,
+    TerminalNode,
+    Tree,
+)
 
 
 @dataclass(frozen=True)
@@ -57,6 +66,39 @@ def validate_tree(tree: Tree) -> list[ValidationIssue]:
 
     if not any(isinstance(n, TerminalNode) for n in tree.nodes.values()):
         issues.append(ValidationIssue(None, "tree has no terminal node"))
+
+    if tree.spec_version != "0.1":
+        captures = {
+            c
+            for n in tree.nodes.values()
+            if (c := getattr(n, "capture", None))
+        }
+
+        def _lint(text: object, nid: str) -> None:
+            if isinstance(text, str):
+                for m in PLACEHOLDER_RE.finditer(text):
+                    root = m.group(1).split(".")[0]
+                    if root not in captures:
+                        issues.append(
+                            ValidationIssue(
+                                nid,
+                                f"placeholder '{m.group(0)}' references unknown capture '{root}'",
+                            )
+                        )
+            elif isinstance(text, dict):
+                for v in text.values():
+                    _lint(v, nid)
+            elif isinstance(text, list):
+                for v in text:
+                    _lint(v, nid)
+
+        for nid, node in tree.nodes.items():
+            if isinstance(node, ActionNode):
+                _lint(node.args, nid)
+            elif isinstance(node, (AskNode, JudgmentNode)):
+                _lint(node.prompt, nid)
+            elif isinstance(node, TerminalNode):
+                _lint(node.summary, nid)
 
     if tree.entry in tree.nodes:
         seen: set[str] = set()
