@@ -71,13 +71,13 @@ def _cmd_viz(path: Path) -> int:
     return 0
 
 
-def _cmd_serve(trees_dir: Path, sessions: Path | None, name: str) -> int:
+def _cmd_serve(trees_dir: Path, sessions: Path | None, name: str, elicit: bool) -> int:
     from fastmcp import FastMCP
 
     from .mount import DecisionTrees
 
     mcp = FastMCP(name)
-    DecisionTrees(mcp, trees_dir, sessions_dir=sessions)
+    DecisionTrees(mcp, trees_dir, sessions_dir=sessions, elicit=elicit)
     mcp.run()
     return 0
 
@@ -90,6 +90,10 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("trees_dir", type=Path)
     p_serve.add_argument("--sessions", type=Path, default=None)
     p_serve.add_argument("--name", default="mcptree")
+    p_serve.add_argument(
+        "--no-elicit", action="store_true",
+        help="Never use MCP elicitation for ask nodes (agent relays instead)",
+    )
 
     p_val = sub.add_parser("validate", help="Validate all trees in a directory")
     p_val.add_argument("trees_dir", type=Path)
@@ -99,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "serve":
-        return _cmd_serve(args.trees_dir, args.sessions, args.name)
+        return _cmd_serve(args.trees_dir, args.sessions, args.name, not args.no_elicit)
     if args.command == "validate":
         return _cmd_validate(args.trees_dir)
     return _cmd_viz(args.tree_file)
