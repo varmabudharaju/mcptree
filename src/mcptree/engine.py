@@ -48,6 +48,7 @@ class TraceEntry:
     resolved_branch: str | None
     rationale: str | None
     timestamp: str
+    source: str | None = None  # "elicitation" | "tree_answer" | None (auto-advanced)
 
 
 @dataclass
@@ -132,7 +133,7 @@ def interpolate(value: object, facts: dict[str, object]) -> object:
 
 
 def _append(state: SessionState, node: str, input_: object, branch: str | None,
-            rationale: str | None = None) -> None:
+            rationale: str | None = None, source: str | None = None) -> None:
     state.trace.append(
         TraceEntry(
             seq=len(state.trace) + 1,
@@ -141,6 +142,7 @@ def _append(state: SessionState, node: str, input_: object, branch: str | None,
             resolved_branch=branch,
             rationale=rationale,
             timestamp=_now(),
+            source=source,
         )
     )
 
@@ -274,6 +276,7 @@ def submit(
     value: object,
     rationale: str | None = None,
     is_error: bool = False,
+    source: str = "tree_answer",
 ) -> dict[str, object]:
     if state.done:
         return envelope(state, error="finished_session: this session has ended")
@@ -303,7 +306,7 @@ def submit(
             target = next(o.then for o in node.options if o.id == value)
         if node.capture:
             state.facts[node.capture] = value
-        _append(state, node.id, value, target, rationale)
+        _append(state, node.id, value, target, rationale, source=source)
     elif isinstance(node, ActionNode):
         if is_error:
             if node.on_error is None:
@@ -312,7 +315,7 @@ def submit(
                     error="tool_error_unhandled: tool failed and no on_error branch; retry or abort",
                 )
             target = node.on_error
-            _append(state, node.id, {"error": value}, target)
+            _append(state, node.id, {"error": value}, target, source=source)
         else:
             encoded = _json.dumps(value, default=str)
             if len(encoded.encode()) > MAX_FACT_BYTES:
@@ -328,7 +331,7 @@ def submit(
             if node.capture:
                 state.facts[node.capture] = value
             target = node.next
-            _append(state, node.id, value, target)
+            _append(state, node.id, value, target, source=source)
     else:  # pragma: no cover - condition/terminal never await input
         raise TypeError(f"node {node.id} cannot accept submissions")
 
