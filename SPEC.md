@@ -1,6 +1,6 @@
 # mcptree Protocol Specification
 
-**Version:** 0.1
+**Version:** 0.2
 **Status:** Draft
 
 This document specifies the mcptree wire protocol: a set of MCP tools and a JSON
@@ -144,6 +144,69 @@ nodes:
     summary: "Page on-call; attach the tree trace."
 ```
 
+And a complete `"0.2"` document — `trees/deploy.yaml` in this repository —
+exercising every 0.2 addition (interpolation §2.9, composite predicates §2.4,
+judgment `capture` §2.3):
+
+```yaml
+mcptree: "0.2"
+id: deploy-gate
+title: Production deploy gate
+entry: which_service
+
+nodes:
+  which_service:
+    type: ask
+    prompt: Which service is being deployed?
+    capture: service
+    next: check_ci
+
+  check_ci:
+    type: action
+    tool: ci_status
+    args: { service: "{{ service }}" }
+    result: { capture: ci }
+    next: gate_on_failures
+
+  gate_on_failures:
+    type: condition
+    on: ci.recent_failures
+    branches:
+      - when: { all: [ { gte: 1 }, { lte: 2 } ] }
+        then: assess_risk
+      - when: { gt: 2 }
+        then: block
+    default: approve
+
+  assess_risk:
+    type: judgment
+    prompt: "CI shows {{ ci.recent_failures }} recent failure(s) for {{ service }}. Are they related to this change?"
+    evidence: [ci]
+    options:
+      - { id: related,   then: route_risk }
+      - { id: unrelated, then: route_risk }
+    capture: risk
+    require_rationale: true
+
+  route_risk:
+    type: condition
+    on: risk
+    branches:
+      - when: { eq: unrelated }
+        then: approve
+    default: block
+
+  approve:
+    type: terminal
+    outcome: approved
+    summary: "Deploy {{ service }}: approved."
+
+  block:
+    type: terminal
+    outcome: blocked
+    summary: "Deploy {{ service }}: blocked; resolve CI failures first."
+```
+
 ### 2.1 Top-level fields
 
 | Field | Type | Required | Meaning |
@@ -205,7 +268,7 @@ references MUST resolve to another node id in the same document.
 | `prompt` | string | yes | Shown to the human as `instruction`. |
 | `options` | list | no | `[{ id: <string>, then: <node id> }, …]`. If present, the answer MUST be one of these ids (`expects.kind = "enum"`). |
 | `capture` | string | no | Fact name the answer is written to. |
-| `next` | string | conditionally | REQUIRED if `options` is absent (free-text ask); ignored if `options` is present (routing comes from the matched option's `then`). |
+| `next` | string | conditionally | REQUIRED if `options` is absent (free-text ask); **MUST NOT be present** if `options` is present (0.2 tightening — earlier drafts said "ignored", but a dead edge hides runtime-unreachable nodes from validation, so validators now reject the combination). |
 
 If `options` is omitted, `expects.kind = "text"` and the node MUST have both
 `capture` and `next` (free-text answers still need somewhere to write the value
@@ -219,6 +282,7 @@ and somewhere to go next).
 | `evidence` | list of strings | no, defaults `[]` | Fact names copied into the envelope's `evidence` object. |
 | `options` | list | yes, non-empty | `[{ id: <string>, then: <node id> }, …]`. The model's answer MUST be one of these ids — this is the **only** place the model has open-ended discretion, and it is bounded to a declared enum. |
 | `require_rationale` | boolean | no, defaults `false` | If true, `tree_answer` MUST include a non-empty `rationale`; the rationale is recorded in the trace. |
+| `capture` | string | no (**0.2 only**) | Fact name the chosen option id is written to, so downstream `condition` nodes can branch on a classification. In a `"0.1"` document this field MUST be rejected at parse time. |
 
 **`action`**
 
@@ -252,7 +316,22 @@ supported operators, evaluated against the fact resolved by `on`:
 | `lt` | `fact < value` | |
 | `lte` | `fact <= value` | |
 | `in` | `fact in value` | `value` is typically a list. |
-| `exists` | fact path resolves to something | The only op evaluated when the fact is missing; all others are `false` on a missing fact. |
+| `exists` | fact path resolves to something | The only leaf op evaluated when the fact is missing; all other leaves are `false` on a missing fact. |
+| `all` | every sub-predicate is true | **0.2 only.** Value is a non-empty list of predicates; arbitrary nesting. |
+| `any` | some sub-predicate is true | **0.2 only.** Value is a non-empty list of predicates; arbitrary nesting. |
+| `not` | sub-predicate is false | **0.2 only.** Value is a single predicate. |
+
+All predicates in one `when` evaluate against the same fact resolved by `on`.
+Composition is purely logical over leaf results — note the consequence that
+`not: {eq: 1}` on a *missing* fact is `true`, since every leaf but `exists` is
+`false` on a missing fact. In a `"0.1"` document, `all`/`any`/`not` MUST be
+rejected at parse time.
+
+```yaml
+when: { all: [ { gte: 1 }, { lte: 2 } ] }    # and
+when: { any: [ { eq: 200 }, { eq: 204 } ] }  # or
+when: { not: { eq: 200 } }                   # negation
+```
 
 Comparisons that raise `TypeError` (e.g. comparing a string to an int with `gt`)
 evaluate to `false` rather than raising — a conforming engine MUST NOT crash a
@@ -302,10 +381,48 @@ hold:
 - Any `then`/`next`/`on_error`/`default` reference does not name a node in `nodes`.
 - A `condition` node has no `default` (§2.5).
 - An `ask` node has neither `options` nor (`capture` and `next`).
+- An `ask` node has both `options` and `next` (0.2 tightening, §2.3).
+- A `"0.2"` document contains a placeholder whose root segment names no declared
+  `capture` (§2.9).
 - The tree has no `terminal` node at all.
 - Some node is unreachable from `entry` (computed by following all outgoing
-  references, including `default`/`on_error`, from `entry`).
+  references, including `default`/`on_error`, from `entry` — but **not** an
+  `ask` node's `next` when `options` is present, since that edge is never taken
+  at runtime).
 - `mcptree` names an unsupported spec version (§6).
+
+### 2.9 Interpolation (0.2 documents only)
+
+Documents declaring `mcptree: "0.2"` may reference session facts with
+placeholders of the form `{{ <fact path> }}`, where the fact path is the same
+dotted form `condition.on` uses (regex: `\{\{\s*[A-Za-z_]\w*(?:\.\w+)*\s*\}\}`).
+
+Placeholders are resolved in these locations, and only these:
+
+- `action.args` — recursively through nested mappings and lists
+- `ask.prompt`, `judgment.prompt`
+- `terminal.summary`
+
+Resolution rules:
+
+- **Whole-string placeholder** (the string is exactly one placeholder, modulo
+  surrounding whitespace): replaced by the fact's value with its JSON type
+  intact — numbers stay numbers, objects stay objects.
+- **Embedded placeholder** (inside a longer string): string substitution — the
+  value itself for strings, compact JSON (`json.dumps(v, separators=(",", ":"))`)
+  for everything else.
+- **Missing fact**: the placeholder is left verbatim. Never a silent null —
+  visible in `expects.args`/`instruction`, where it can be noticed and debugged.
+
+Resolution happens at envelope-build time against the session's current facts
+(deterministic: facts cannot change while a node is waiting). The pinned tree
+snapshot (§5.6) stores the raw template; the trace stores reported results,
+unchanged.
+
+Load-time validation (§2.8): every placeholder's root segment MUST name a
+`capture` declared somewhere in the tree (`ask.capture`, `action.result.capture`,
+`judgment.capture`). Documents declaring `"0.1"` never interpolate — a
+placeholder-shaped string in a 0.1 document is passed through verbatim.
 
 ---
 
@@ -356,15 +473,17 @@ in the error message.
       "input": { "status": 503 },
       "resolved_branch": "branch_on_status",
       "rationale": null,
-      "timestamp": "2026-07-24T02:34:16.460285+00:00"
+      "timestamp": "2026-07-24T02:34:16.460285+00:00",
+      "source": "tree_answer"
     }
   ]
 }
 ```
 
 Each trace entry MUST have the shape `{ seq, node, input, resolved_branch,
-rationale, timestamp }` (§5.5). `seq` is a monotonically increasing integer across
-the whole session and is **distinct from** the envelope's `step` (see §5.2).
+rationale, timestamp, source }` (§5.5). `seq` is a monotonically increasing
+integer across the whole session and is **distinct from** the envelope's `step`
+(see §5.2).
 
 ---
 
@@ -504,7 +623,7 @@ Every node the session passes through — including auto-advanced `condition` an
 the final `terminal` — appends one entry:
 
 ```
-{ seq, node, input, resolved_branch, rationale, timestamp }
+{ seq, node, input, resolved_branch, rationale, timestamp, source }
 ```
 
 - `seq` — 1-based, strictly increasing for the life of the session.
@@ -515,6 +634,11 @@ the final `terminal` — appends one entry:
   which advances nowhere).
 - `rationale` — the judgment rationale if one was given, else `null`.
 - `timestamp` — ISO-8601 UTC.
+- `source` — the channel the input arrived through: `"elicitation"` (collected
+  by the client's own human-facing elicitation UI, §5.8), `"tree_answer"`
+  (submitted by the agent through the tool), or `null` (auto-advanced nodes,
+  which take no input). This is what lets an auditor distinguish "the human
+  answered" from "the agent relayed something" (§1.1).
 
 `tree_trace` returns the full list plus `tree_hash` and the final `outcome`
 (§3.3). This is what gets attached to an escalation.
@@ -536,21 +660,60 @@ under a session store directory (default `~/.mcptree/sessions`, overridable per
 mount/CLI invocation). This makes sessions survive server restarts: an agent that
 lost all context can call `tree_status(session_id)` on a freshly started server
 process and get back the exact envelope it would have gotten before the restart.
-Session ids have the form `ses_` followed by 12 lowercase hex characters.
 
-Session saves are atomic per session file; no cross-session or cross-process
-locking is guaranteed.
+Session ids have the form `ses_` followed by 12 lowercase hex characters.
+Servers MUST reject any id not matching that shape as an unknown session,
+without touching storage (0.2 tightening — lenient sanitization can collide two
+distinct ids onto one file).
+
+Session saves are atomic per session file. A server MUST serialize submissions
+per session within a process (0.2 tightening — concurrent `tree_answer` calls
+must resolve to exactly one accepted advance, the rest rejected in-envelope);
+cross-process locking remains out of scope.
+
+### 5.8 Elicitation
+
+MCP elicitation lets a server ask the *client* to prompt its human directly.
+When the client supports it, a conforming server SHOULD present `ask` prompts
+via elicitation before returning an `awaiting_answer` envelope:
+
+- An `ask` with `options` elicits a choice among the option ids; a free-text
+  `ask` elicits a string.
+- An **accepted** elicitation is submitted into the session exactly as a
+  `tree_answer` would be, but recorded with `source: "elicitation"` (§5.5).
+  Consecutive `ask` nodes MAY be elicited within a single tool call.
+- A **declined or cancelled** elicitation, or a client without the capability,
+  MUST fall back to returning the envelope unchanged — the agent relays the
+  question and answers via `tree_answer` as usual.
+- If an elicited answer is rejected in-envelope (e.g. `fact_too_large`, or
+  `step_mismatch` from a concurrent advance), the server MUST stop eliciting
+  and return that envelope.
+
+Servers MUST offer a way to disable elicitation entirely (reference
+implementation: `DecisionTrees(..., elicit=False)` / `mcptree serve --no-elicit`).
 
 ---
 
 ## 6. Versioning
 
-Every tree document MUST declare `mcptree: "0.1"` at the top level. A conforming
-loader MUST reject any document whose `mcptree` value it does not recognize —
-this document defines behavior for `"0.1"` only. There is no forward- or
-backward-compatibility guarantee across major protocol revisions; a `0.x` engine
-MUST NOT attempt to load a tree declaring a version it doesn't implement.
+Every tree document MUST declare its spec version at the top level:
+`mcptree: "0.1"` or `mcptree: "0.2"`. A conforming 0.2 engine:
+
+- MUST load `"0.2"` documents with the full behavior in this document.
+- MUST also load `"0.1"` documents, with 0.1 semantics: no interpolation
+  (§2.9), and composite predicates (§2.4) or judgment `capture` (§2.3) in a
+  `"0.1"` document MUST be rejected at parse time with an error identifying the
+  0.2 requirement.
+- MUST reject any document whose `mcptree` value it does not recognize.
+
+Server behavior defined in 0.2 that is not part of the tree document format —
+elicitation (§5.8), the trace `source` field (§5.5), strict session ids and
+in-process serialization (§5.7), the `ask` `options`+`next` rejection (§2.8) —
+applies regardless of which version a loaded document declares.
+
+There is no forward-compatibility guarantee: an engine MUST NOT attempt to load
+a tree declaring a version it doesn't implement.
 
 This specification itself is versioned independently of the `mcptree` Python
 package's own release version (`pyproject.toml`), though both currently track
-`0.1`.
+`0.2`.

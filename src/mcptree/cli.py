@@ -6,12 +6,33 @@ import argparse
 import sys
 from pathlib import Path
 
+from typing import cast
+
 from .loader import TreeLoadError, load_tree_file
-from .models import ActionNode, AskNode, ConditionNode, JudgmentNode, TerminalNode, Tree
+from .models import (
+    ActionNode,
+    AskNode,
+    ConditionNode,
+    JudgmentNode,
+    Predicate,
+    TerminalNode,
+    Tree,
+)
 
 
 def _esc(text: object) -> str:
     return str(text).replace('"', "#quot;")
+
+
+def _pred_label(p: Predicate) -> str:
+    if p.op == "exists":
+        return "exists"
+    if p.op == "not":
+        return f"not({_pred_label(cast(Predicate, p.value))})"
+    if p.op in ("all", "any"):
+        inner = ", ".join(_pred_label(q) for q in cast("tuple[Predicate, ...]", p.value))
+        return f"{p.op}({inner})"
+    return f"{p.op} {_esc(p.value)}"
 
 
 def render_mermaid(tree: Tree) -> str:
@@ -30,8 +51,7 @@ def render_mermaid(tree: Tree) -> str:
     for nid, node in tree.nodes.items():
         if isinstance(node, ConditionNode):
             for b in node.branches:
-                label = f"{b.when.op} {_esc(b.when.value)}" if b.when.op != "exists" else "exists"
-                lines.append(f"  {nid} -- {label} --> {b.then}")
+                lines.append(f"  {nid} -- {_pred_label(b.when)} --> {b.then}")
             if node.default:
                 lines.append(f"  {nid} -- default --> {node.default}")
         elif isinstance(node, (AskNode, JudgmentNode)):

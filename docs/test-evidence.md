@@ -5,9 +5,9 @@ _Generated 2026-07-24T02:49:37Z._
 <!-- shotlist:start -->
 ### Mcptree Validate
 
-<img src="screenshots/01-mcptree-validate.png" width="100%" alt="mcptree validate trees/ — lints every tree in the directory (node types, required fields, dangling refs) and fails fast on the first error; incident-triage passes."/>
+<img src="screenshots/01-mcptree-validate.png" width="100%" alt="mcptree validate trees/ — lints every tree in the directory (node types, required fields, dangling refs, 0.2 placeholder lint); both the 0.1 incident-triage tree and the 0.2 deploy-gate tree pass."/>
 
-mcptree validate trees/ — lints every tree in the directory (node types, required fields, dangling refs) and fails fast on the first error; incident-triage passes.
+mcptree validate trees/ — lints every tree in the directory (node types, required fields, dangling refs, 0.2 placeholder lint); both the 0.1 incident-triage tree and the 0.2 deploy-gate tree pass.
 
 `mcptree validate trees/`
 
@@ -19,9 +19,17 @@ mcptree viz trees/incident.yaml — the incident-triage tree rendered as a Merma
 
 `mcptree viz trees/incident.yaml`
 
+### Mcptree Viz Deploy
+
+<img src="screenshots/03-mcptree-viz-deploy.png" width="100%" alt="mcptree viz trees/deploy.yaml — the 0.2 deploy-gate tree rendered as a Mermaid flowchart: the interpolated ci_status action, the all-composite failure band on the condition, and the captured judgment (risk) feeding the route_risk condition."/>
+
+mcptree viz trees/deploy.yaml — the 0.2 deploy-gate tree rendered as a Mermaid flowchart: the interpolated ci_status action, the all-composite failure band on the condition, and the captured judgment (risk) feeding the route_risk condition.
+
+`mcptree viz trees/deploy.yaml`
+
 ### Demo Phase1 Start
 
-<img src="screenshots/03-demo-phase1-start.png" width="100%" alt="Process 1 (phase1) — a fresh OS process: tree_start opens a session on incident-triage, tree_answer reports a 503 health check and the engine auto-advances past the pure-data condition node straight to inspect_logs, then the process exits. The session lives only on disk from here."/>
+<img src="screenshots/04-demo-phase1-start.png" width="100%" alt="Process 1 (phase1) — a fresh OS process: tree_start opens a session on incident-triage, tree_answer reports a 503 health check and the engine auto-advances past the pure-data condition node straight to inspect_logs, then the process exits. The session lives only on disk from here."/>
 
 Process 1 (phase1) — a fresh OS process: tree_start opens a session on incident-triage, tree_answer reports a 503 health check and the engine auto-advances past the pure-data condition node straight to inspect_logs, then the process exits. The session lives only on disk from here.
 
@@ -29,7 +37,7 @@ Process 1 (phase1) — a fresh OS process: tree_start opens a session on inciden
 
 ### Demo Phase2 Resume
 
-<img src="screenshots/04-demo-phase2-resume.png" width="100%" alt="Process 2 (phase2) — a brand-new OS process, sharing nothing with phase1 but the sessions directory: tree_status resumes the same session_id at inspect_logs, tree_answer reports OOM logs then the judgment classification, landing on outcome: remediate. tree_trace prints the full audit path from check_health to remediate_oom — real crash-proof resume, not a mock."/>
+<img src="screenshots/05-demo-phase2-resume.png" width="100%" alt="Process 2 (phase2) — a brand-new OS process, sharing nothing with phase1 but the sessions directory: tree_status resumes the same session_id at inspect_logs, tree_answer reports OOM logs then the judgment classification, landing on outcome: remediate. tree_trace prints the full audit path from check_health to remediate_oom — real crash-proof resume, not a mock."/>
 
 Process 2 (phase2) — a brand-new OS process, sharing nothing with phase1 but the sessions directory: tree_status resumes the same session_id at inspect_logs, tree_answer reports OOM logs then the judgment classification, landing on outcome: remediate. tree_trace prints the full audit path from check_health to remediate_oom — real crash-proof resume, not a mock.
 

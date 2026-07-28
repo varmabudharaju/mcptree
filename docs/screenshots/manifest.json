@@ -1,17 +1,17 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-24T02:49:37Z",
+  "generated_at": "2026-07-28T19:48:17Z",
   "config": ".capture.yaml",
-  "shot_count": 4,
+  "shot_count": 5,
   "shots": [
     {
       "index": 1,
       "name": "mcptree-validate",
       "kind": "cli",
-      "alt": "mcptree validate trees/ \u2014 lints every tree in the directory (node types, required fields, dangling refs) and fails fast on the first error; incident-triage passes.",
+      "alt": "mcptree validate trees/ \u2014 lints every tree in the directory (node types, required fields, dangling refs, 0.2 placeholder lint); both the 0.1 incident-triage tree and the 0.2 deploy-gate tree pass.",
       "file": "01-mcptree-validate.png",
-      "bytes": 37287,
-      "sha256": "8142c4bfcabf55f9fc961bfcd41fd995c6944bce48b6461800aa18367156a217",
+      "bytes": 43176,
+      "sha256": "faf6a8ba7509c49a20a94ced8260d4b3ac8510df284ed4dea47409eddc56996a",
       "deterministic": false,
       "source": "mcptree validate trees/"
     },
@@ -19,7 +19,7 @@
       "index": 2,
       "name": "mcptree-viz",
       "kind": "cli",
-      "alt": "mcptree viz trees/incident.yaml \u2014 the incident-triage tree rendered as a Mermaid flowchart: all five node types (action, condition, judgment, ask, terminal), branch labels, and the on_error edge, generated straight from the YAML.",
+      "alt": "mcptree viz trees/incident.yaml \u2014 the incident-triage tree rendered as a Mermaid flowchart: all five node types (action, condition, judgment, ask, terminal) and branch labels, generated straight from the YAML.",
       "file": "02-mcptree-viz.png",
       "bytes": 177177,
       "sha256": "e6ce31ad498c8bcf283c6c6653a494e45ced7a60151eb9d16bf5ef1917a98ac4",
@@ -28,33 +28,44 @@
     },
     {
       "index": 3,
+      "name": "mcptree-viz-deploy",
+      "kind": "cli",
+      "alt": "mcptree viz trees/deploy.yaml \u2014 the 0.2 deploy-gate tree rendered as a Mermaid flowchart: the interpolated ci_status action, the all-composite failure band on the condition, and the captured judgment (risk) feeding the route_risk condition.",
+      "file": "03-mcptree-viz-deploy.png",
+      "bytes": 149684,
+      "sha256": "cff326a4dad8c2524df626bea25e06f15a7ec32615d3ae42f517d2ecccbd1c11",
+      "deterministic": false,
+      "source": "mcptree viz trees/deploy.yaml"
+    },
+    {
+      "index": 4,
       "name": "demo-phase1-start",
       "kind": "session",
       "alt": "Process 1 (phase1) \u2014 a fresh OS process: tree_start opens a session on incident-triage, tree_answer reports a 503 health check and the engine auto-advances past the pure-data condition node straight to inspect_logs, then the process exits. The session lives only on disk from here.",
-      "file": "03-demo-phase1-start.png",
-      "bytes": 94272,
-      "sha256": "a24ff253e4cafb4dd65ddf04842b141e15f8d924330d798024bea55b555fcea9",
+      "file": "04-demo-phase1-start.png",
+      "bytes": 151116,
+      "sha256": "cf365a53a299c0a174f83f4c499b2b5b815eaf4b4f8113b68f47fbb7b270e226",
       "deterministic": false,
       "source": "rm -rf examples/.demo_sessions; python3 examples/incident_response.py phase1 2>/dev/null | tee /tmp/mcptree_demo_phase1.txt"
     },
     {
-      "index": 4,
+      "index": 5,
       "name": "demo-phase2-resume",
       "kind": "session",
       "alt": "Process 2 (phase2) \u2014 a brand-new OS process, sharing nothing with phase1 but the sessions directory: tree_status resumes the same session_id at inspect_logs, tree_answer reports OOM logs then the judgment classification, landing on outcome: remediate. tree_trace prints the full audit path from check_health to remediate_oom \u2014 real crash-proof resume, not a mock.",
-      "file": "04-demo-phase2-resume.png",
-      "bytes": 144606,
-      "sha256": "65de04006ae43bde4f5a2be17958ec61470c271a5d412f036c4aa7e5b9173bb6",
+      "file": "05-demo-phase2-resume.png",
+      "bytes": 140090,
+      "sha256": "a3c556d23bd4071ce1a71b1e380f4bbefa182968454accf33ceaefc5f3816800",
       "deterministic": false,
       "source": "python3 examples/incident_response.py phase2 $(grep -o 'ses_[a-f0-9]*' /tmp/mcptree_demo_phase1.txt | head -1) 2>/dev/null"
     }
   ],
   "environment": {
-    "shotlist": "0.3.3",
+    "shotlist": "0.2.0",
     "python": "3.11.1",
     "platform": "darwin",
-    "playwright": "1.60.0",
+    "playwright": "1.61.0",
     "chromium": null
   },
-  "git_sha": "c23d6de"
+  "git_sha": "a8cbef1"
 }
