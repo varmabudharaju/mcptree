@@ -37,3 +37,19 @@ def test_viz_command(capsys: pytest.CaptureFixture[str]) -> None:
     code = main(["viz", str(TREE_PATH)])
     assert code == 0
     assert "flowchart TD" in capsys.readouterr().out
+
+
+def test_mermaid_escapes_quotes() -> None:
+    from mcptree.models import tree_from_dict
+
+    tree = tree_from_dict(
+        {
+            "mcptree": "0.1", "id": "t", "title": "T", "entry": "a",
+            "nodes": {
+                "a": {"type": "action", "tool": 'curl "quoted"', "next": "end"},
+                "end": {"type": "terminal", "outcome": "done", "summary": "s"},
+            },
+        }
+    )
+    out = render_mermaid(tree)
+    assert '"quoted"' not in out and "#quot;quoted#quot;" in out
